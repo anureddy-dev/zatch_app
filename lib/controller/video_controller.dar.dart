@@ -1,4 +1,3 @@
-// video_controller.dart
 import '../model/video_item_model.dart';
 
 class VideoController {

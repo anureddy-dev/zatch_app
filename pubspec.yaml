@@ -36,6 +36,18 @@ dependencies:
   cupertino_icons: ^1.0.8
   video_player: ^2.8.1
   country_code_picker: ^3.3.0
+  dio:
+  http:
+  flutter_secure_storage:
+  get:
+  flutter_staggered_grid_view:
+  shared_preferences:
+  share_plus:
+  google_maps_flutter:
+  build_runner:
+  json_serializable:
+  geolocator:
+  smooth_page_indicator:
 
 dev_dependencies:
   flutter_test:
@@ -46,6 +58,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
+  #   dart run build_runner build --delete-conflicting-outputs
   flutter_lints: ^5.0.0
 
 # For information on the generic Dart part of this file, see the

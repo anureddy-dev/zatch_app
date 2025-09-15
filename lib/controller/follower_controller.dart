@@ -1,22 +1,30 @@
-
-
+import 'package:zatch_app/services/api_service.dart';
 import '../model/follower_model.dart';
 
 class FollowerController {
+  final ApiService _api = ApiService();
+
   List<Follower> followers = [
-    Follower('Samera', 'Fashion', 'assets/images/img1.png'),
-    Follower('Rajeev', 'Fashion', 'assets/images/img2.png'),
-    Follower('Priya', 'Tech', 'assets/images/img3.png'),
-    Follower('Samera', 'Fashion', 'assets/images/img1.png'),
-    Follower('Rajeev', 'Fashion', 'assets/images/img2.png'),
-    Follower('Priya', 'Tech', 'assets/images/img3.png'),
+    Follower("Samera", "Fashion",
+        "https://randomuser.me/api/portraits/women/44.jpg",
+        id: "6898ae8836e67718f8f1f626"),
+    Follower("Rajeev", "Fashion",
+        "https://randomuser.me/api/portraits/men/46.jpg",
+        id: "6898ae8836e67718f8f1f627"),
+    Follower("Priya", "Tech",
+        "https://randomuser.me/api/portraits/women/65.jpg",
+        id: "68988ae8836e67718f8f1f62"),
+
   ];
 
-  void toggleFollow(int index) {
-    followers[index].isFollowing = !followers[index].isFollowing;
-  }
-
-  void addFollower(Follower follower) {
-    followers.add(follower);
+  Future<void> toggleFollow(int index) async {
+    final follower = followers[index];
+    try {
+      final res = await _api.toggleFollowUser(follower.id);
+      //print("Toggled follow: ${res.message}, now following: ${res.isFollowing}");
+     // followers[index] = follower.copyWith(isFollowing: res.isFollowing);
+    } catch (e) {
+      print("Toggle follow failed: $e");
+    }
   }
 }

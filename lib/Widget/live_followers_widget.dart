@@ -1,113 +1,185 @@
 import 'package:flutter/material.dart';
+import 'package:zatch_app/controller/live_follower_controller.dart';
+import 'package:zatch_app/view/live_view/live_stream_screen.dart';
 
-import '../controller/live_follower_controller.dart';
-
-
-class LiveFollowersWidget extends StatefulWidget {
-  const LiveFollowersWidget({super.key});
-
-  @override
-  State<LiveFollowersWidget> createState() => _LiveFollowersWidgetState();
-}
-
-class _LiveFollowersWidgetState extends State<LiveFollowersWidget> {
-  final LiveFollowerController _controller = LiveFollowerController();
+class LiveFollowersWidget extends StatelessWidget {
+  LiveFollowersWidget({super.key});
+  final LiveFollowerController controller = LiveFollowerController();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      children: [
+        /// Header Row
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                'Live From Followers',
+            children: [
+              const Text(
+                "Live From Followers",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              Text(
-                'See All',
-                style: TextStyle(color: Colors.black),
+              GestureDetector(
+                onTap: () {
+                },
+                child: const Text(
+                  "See All",
+                  style: TextStyle(color: Colors.blue),
+                ),
               ),
+
             ],
           ),
-          const SizedBox(height: 10),
-          SingleChildScrollView(
+        ),
+
+        /// Horizontal Scroll
+        SizedBox(
+          height: 220,
+          child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _controller.followers.map((follower) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 10.0),
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 150,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16.0),
-                          image: DecorationImage(
-                            image: AssetImage(follower.imageAsset),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 10,
-                        left: 10,
-                        child: Container(
-                          padding: const EdgeInsets.all(5.0),
+            itemCount: controller.liveUsers.length,
+            itemBuilder: (context, index) {
+              final user = controller.liveUsers[index];
+
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => LiveStreamScreen(user: user),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(
+                      children: [
+                        /// Background Image
+                        Container(
+                          height: 220,
+                          width: 140,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFB7DF4B),
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                          child: const Text(
-                            'Live 465',
-                            style: TextStyle(color: Colors.black, fontSize: 12),
+                            borderRadius: BorderRadius.circular(20),
+                            image: DecorationImage(
+                              image: NetworkImage(user.image),
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        bottom: 10,
-                        left: 10,
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 12,
-                              backgroundImage: AssetImage(follower.imageAsset),
+
+                        /// Live Tag
+                        Positioned(
+                          top: 10,
+                          left: 10,
+                          child: Container(
+                            padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.greenAccent,
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            const SizedBox(width: 5),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  follower.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  follower.category,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
+                            child: const Text(
+                              "Live · 465",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
+
+                        /// User Info Bottom
+                        Positioned(
+                          bottom: 10,
+                          left: 10,
+                          right: 10,
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundImage: NetworkImage(user.image),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded( // 👈 prevents overflow
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user.name,
+                                      overflow: TextOverflow.ellipsis, // 👈 adds "..."
+                                      maxLines: 1,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      user.category,
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 10,
+                          left: 10,
+                          right: 10,
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundImage: NetworkImage(user.image),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded( // 👈 prevents overflow
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user.name,
+                                      overflow: TextOverflow.ellipsis, // 👈 adds "..."
+                                      maxLines: 1,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      user.category,
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+
+                      ],
+                    ),
                   ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
+                ),
+              );
+            }
+                      ),
+        ),
+      ],
     );
   }
 }

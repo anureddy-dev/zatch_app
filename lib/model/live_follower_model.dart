@@ -1,8 +1,17 @@
-class LiveFollower {
+class LiveFollowerModel {
   final String name;
+  final String image;
   final String category;
-  final String imageAsset;
-  bool isFollowing;
+  final int viewers;
+  final double rating;
+  final int followers;
 
-  LiveFollower(this.name, this.category, this.imageAsset, {this.isFollowing = false});
+  LiveFollowerModel({
+    required this.name,
+    required this.image,
+    required this.category,
+    required this.viewers,
+    required this.rating,
+    required this.followers,
+  });
 }

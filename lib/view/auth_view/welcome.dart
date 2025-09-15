@@ -9,13 +9,12 @@ class WelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = WelcomeController();
 
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
           children: [
-            // White container with rounded bottom
+            /// White background with rounded bottom
             Container(
               height: MediaQuery.of(context).size.height,
               decoration: const BoxDecoration(
@@ -24,93 +23,61 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
 
-            // Top right concentric green circles
+            /// Top right concentric circles
             Positioned(
               top: -35,
-              right: -90,
-              child: Container(
-                width: 350,
-                height: 250,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(width: 2, color: Theme.of(context).colorScheme.primary,),
-                ),
-              ),
+              right: -100,
+              child: _circleBorder(context, 350, 250),
             ),
             Positioned(
               top: -25,
               right: -90,
-              child: Container(
-                width: 300,
-                height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(width: 2, color: Theme.of(context).colorScheme.primary,),
-                ),
-              ),
+              child: _circleBorder(context, 300, 200),
             ),
 
-            // Bottom left green angled box (like a triangle)
+            /// Bottom left angled boxes
             Positioned(
               bottom: 180,
               left: -30,
               child: Transform.rotate(
                 angle: -0.5,
-                child: Container(
-                  width: 120,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Theme.of(context).colorScheme.primary, width: 3),
-                  ),
-                ),
+                child: _angledBox(context, 120, 200),
               ),
             ),
             Positioned(
               bottom: 180,
               left: -30,
-              child: Transform.rotate(
-                angle: -0,
-                child: Container(
-                  width: 120,
-                  height: 300,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Theme.of(context).colorScheme.primary, width: 3),
-                  ),
-                ),
-              ),
+              child: _angledBox(context, 120, 300),
             ),
 
-            // Main content column
+            /// Main content
             Column(
               children: [
                 const Spacer(flex: 3),
 
-                // Logo
+                /// Logo
                 Image.asset(
                   'assets/images/logo.png',
                   height: 80,
                   width: 80,
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
 
-                // App name
-                const Text(
-                  'Zatch',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black
-                  ),
+                /// App Name
+                Image.asset(
+                  'assets/images/zatch.png',
+                  height: 80,
+                  width: 80,
                 ),
 
                 const Spacer(flex: 2),
 
-                // Bottom lime-green section
+                /// Bottom section
                 Container(
                   width: double.infinity,
-                  height: 250,
-                  padding: const EdgeInsets.fromLTRB(24, 30, 24, 40),
+                  height: 260,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.primary,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
@@ -118,84 +85,113 @@ class WelcomeScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                       Text(
-
+                      Text(
                         'Welcome',
-                        textAlign: TextAlign.left,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 20,
+                          fontSize: 24,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
                         "Welcome to India's first Live Shopping Bazaar",
-                        textAlign: TextAlign.end,
-                        style: TextStyle(fontSize: 14,
+                        style: TextStyle(
+                          fontSize: 14,
                           color: Theme.of(context).colorScheme.onSurface,
                         ),
-
                       ),
-                      const SizedBox(height: 40),
+                      const Spacer(),
 
-                      // Pills-style container for buttons
-                      Container(
-                        decoration: BoxDecoration(
-
-                          borderRadius: BorderRadius.circular(50),
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            // Login button - black background
-                            ElevatedButton(
-                              onPressed: (){
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (context) =>  LoginScreen()),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.black,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 50, vertical: 12),
-                                elevation: 0,
+                      /// Buttons
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          /// Login
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/login');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
                               ),
-                              child: const Text("Login"),
-                            ),
-
-                            // Register button - white background with border
-                            OutlinedButton(
-                              onPressed: (){
-
-                              },
-                              style: OutlinedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black,
-                                side: const BorderSide(color: Colors.white),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 50, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 48,
+                                vertical: 14,
                               ),
-                              child: const Text("Register"),
+                              elevation: 0,
                             ),
-                          ],
-                        ),
-                      )
+                            child: const Text("Login",style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 20
+                            )),
+                          ),
+
+                          /// Register
+                          OutlinedButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/register');
+                            },
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                              side: const BorderSide(color: Colors.white),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 48,
+                                vertical: 14,
+                              ),
+                            ),
+                            child: const Text("Register",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                                  fontSize: 20
+                              ),),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Helper: Circle border
+  Widget _circleBorder(BuildContext context, double w, double h) {
+    return Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          width: 2,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
+  }
+
+  /// Helper: Angled box
+  Widget _angledBox(BuildContext context, double w, double h) {
+    return Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary,
+          width: 3,
         ),
       ),
     );

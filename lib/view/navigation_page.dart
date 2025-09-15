@@ -12,97 +12,81 @@ class CustomBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        clipBehavior: Clip.none,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(25),
+          topRight: Radius.circular(25),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, -1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // Bottom Navigation Bar Background
-          Container(
-            height: 70,
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildNavItem(context: context, icon: Icons.home, index: 0),
-                _buildNavItem(context: context, icon: Icons.explore, index: 1),
-                const SizedBox(width: 60), // space for Z button
-                _buildNavItem(context: context, icon: Icons.local_shipping_outlined, index: 2),
-                _buildProfileIcon(context: context, index: 3),
-              ],
-            ),
-          ),
-
-          // Center Floating Z Button
-          Positioned(
-            bottom: 30, // Raised high enough above gesture bar
-            child: GestureDetector(
-              onTap: () {
-                // Optional central Z action
-              },
-              child: Container(
-                width: 65,
-                height: 65,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Image.asset(
-                    'assets/images/vector.png',
-                    width: 28,
-                    height: 28,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          _buildNavItem(Icons.home_filled, 0, selectedIndex == 0),
+          _buildNavItem(Icons.bookmark_border, 1, selectedIndex == 1),
+          const SizedBox(width: 40), // Space for center FAB
+          _buildNavItem(Icons.settings_rounded, 2, selectedIndex == 2),
+          _buildProfileItem(3, selectedIndex == 3),
         ],
       ),
     );
   }
 
-  // Navigation item builder
-  Widget _buildNavItem({required BuildContext context, required IconData icon, required int index}) {
-    final isSelected = index == selectedIndex;
+  Widget _buildNavItem(IconData icon, int index, bool isSelected) {
     return GestureDetector(
       onTap: () => onItemTapped(index),
       child: Icon(
         icon,
-        size: 28,
-        color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade400,
+        color: isSelected ? const Color(0xFFA3DD00) : Colors.grey,
+        size: 33,
       ),
     );
   }
 
-  // Profile image item builder
-  Widget _buildProfileIcon({required BuildContext context, required int index}) {
-    final isSelected = index == selectedIndex;
+  Widget _buildProfileItem(int index, bool isSelected) {
     return GestureDetector(
       onTap: () => onItemTapped(index),
-      child: Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: isSelected
-              ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
-              : null,
-        ),
+      child: CircleAvatar(
+        radius: 16,
+        backgroundColor: isSelected ? Colors.green.withOpacity(0.2) : Colors.transparent,
         child: const CircleAvatar(
-          radius: 16,
-          backgroundImage: AssetImage('assets/images/img1.png'),
+          radius: 14,
+          backgroundImage: NetworkImage("https://i.pravatar.cc/150?img=5"), // Example user avatar
+        ),
+      ),
+    );
+  }
+}
+
+class FloatingZButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const FloatingZButton({super.key, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 72, // bigger button
+      height: 72,
+      child: FloatingActionButton(
+        onPressed: onPressed,
+        backgroundColor: const Color(0xFFD0FB52),
+        elevation: 8,
+        shape: const CircleBorder(),
+        child: Image.asset(
+          'assets/images/logo.png',
+          width: 36,
+          height: 36,
+          fit: BoxFit.contain,
         ),
       ),
     );

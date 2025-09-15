@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
-
+import 'package:zatch_app/Widget/reel_screen.dart';
 import '../controller/bargain_pick_controller.dart';
 
 class BargainPicksWidget extends StatefulWidget {
@@ -12,32 +11,6 @@ class BargainPicksWidget extends StatefulWidget {
 
 class _BargainPicksWidgetState extends State<BargainPicksWidget> {
   final BargainPickController _controller = BargainPickController();
-  late VideoPlayerController _videoController;
-
-  @override
-  void initState() {
-    super.initState();
-    _videoController = VideoPlayerController.asset(_controller.picks[0].videoAsset!)
-      ..initialize().then((_) {
-        setState(() {});
-      });
-  }
-
-  @override
-  void dispose() {
-    _videoController.dispose();
-    super.dispose();
-  }
-
-  void _togglePlayPause() {
-    setState(() {
-      if (_videoController.value.isPlaying) {
-        _videoController.pause();
-      } else {
-        _videoController.play();
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,81 +19,83 @@ class _BargainPicksWidgetState extends State<BargainPicksWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                'Bargain Picks For You "Zatching Now"',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            children: [
+              Expanded(
+                child: const Text(
+                  'Bargain Picks For You "Zatching Now"',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
-              Text(
-                'See All',
-                style: TextStyle(color: Colors.black),
+              GestureDetector(
+                onTap: () {
+                  if (_controller.picks.isNotEmpty) {
+                   /* Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ReelListScreen(controller: _controller),
+                      ),
+                    );*/
+                  }
+                },
+                child: const Text(
+                  'See All',
+                  style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
+
+          // Horizontal Scroll
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: _controller.picks.asMap().entries.map((entry) {
-                final index = entry.key;
-                final pick = entry.value;
+              children: _controller.picks.map((pick) {
                 return Padding(
                   padding: const EdgeInsets.only(right: 10.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Stack(
-                        children: [
-                          Container(
-                            width: 150,
-                            height: 200,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16.0),
-                              image: pick.imageAsset != null
-                                  ? DecorationImage(
-                                image: AssetImage(pick.imageAsset!),
-                                fit: BoxFit.cover,
-                              )
-                                  : null,
-                            ),
-                            child: pick.videoAsset != null && index == 0
-                                ? _videoController.value.isInitialized
-                                ? VideoPlayer(_videoController)
-                                : const Center(child: CircularProgressIndicator())
-                                : null,
+                  child: InkWell(
+                    onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ReelScreen(pick: pick),
                           ),
-                          if (pick.videoAsset != null && index == 0)
-                            Center(
-                              child: IconButton(
-                                icon: Icon(
-                                  _videoController.value.isPlaying
-                                      ? Icons.pause
-                                      : Icons.play_arrow,
-                                  color: Colors.white,
-                                  size: 40,
-                                ),
-                                onPressed: _togglePlayPause,
+                        );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: 150,
+                              height: 200,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16.0),
+                                color: Colors.grey.shade300,
                               ),
+                              child: const Icon(Icons.video_library, size: 40, color: Colors.black54),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        pick.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                            Container(
+                              width: 150,
+                              height: 200,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16.0),
+                                color: Colors.black26,
+                              ),
+                              child: const Icon(Icons.play_circle_fill, color: Colors.white, size: 50),
+                            ),
+                          ],
                         ),
-                      ),
-                      Text(
-                        pick.subtitle,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
+                        const SizedBox(height: 5),
+                        Text(pick.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(pick.subtitle, style: const TextStyle(fontSize: 12, color: Colors.green)),
+                      ],
+                    ),
                   ),
                 );
               }).toList(),

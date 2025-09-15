@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 class BaseScreen extends StatelessWidget {
   final String title;
   final String subtitle;
-  final List<Widget> contentWidgets; // For inputs, buttons, etc.
-  final Widget? bottomText; // Optional text at the bottom (e.g., Terms & Conditions)
+  final List<Widget> contentWidgets;
+  final Widget? bottomText;
 
   const BaseScreen({
     super.key,
@@ -18,94 +18,89 @@ class BaseScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final screenWidth = constraints.maxWidth;
-        final screenHeight = constraints.maxHeight;
+        final sw = constraints.maxWidth;
+        final sh = constraints.maxHeight;
 
         return Scaffold(
           backgroundColor: Colors.black,
+          resizeToAvoidBottomInset: false,
           body: SafeArea(
             child: Container(
               width: double.infinity,
-              height: screenHeight,
+              height: sh,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(screenHeight * 0.045),
+                  bottom: Radius.circular(sh * 0.045),
                 ),
               ),
               child: Stack(
                 children: [
-                  // Background Shapes
-                  Positioned(
-                    left: -screenWidth * 0.7,
-                    top: screenHeight * 0.67,
-                    child: Transform.rotate(
-                      angle: 0.47,
-                      child: Container(
-                        width: screenWidth * 0.95,
-                        height: screenWidth * 0.95,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            width: 2,
-                            color: const Color(0xFFF1F4FF),
+                  // ---- Static background (does not scroll) ----
+                  Positioned.fill(
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: -sw * 0.7,
+                          top: sh * 0.67,
+                          child: Transform.rotate(
+                            angle: 0.47,
+                            child: Container(
+                              width: sw * 0.95,
+                              height: sw * 0.95,
+                              decoration: BoxDecoration(
+                                border: Border.all(width: 2, color: const Color(0xFFF1F4FF)),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: -screenWidth * 0.7,
-                    top: screenHeight * 0.66,
-                    child: Container(
-                      width: screenWidth * 0.95,
-                      height: screenWidth * 0.95,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          width: 2,
-                          color: const Color(0xFFF1F4FF),
+                        Positioned(
+                          left: -sw * 0.7,
+                          top: sh * 0.66,
+                          child: Container(
+                            width: sw * 0.95,
+                            height: sw * 0.95,
+                            decoration: BoxDecoration(
+                              border: Border.all(width: 2, color: const Color(0xFFF1F4FF)),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: screenWidth * 0.1,
-                    top: -screenWidth * 0.7,
-                    child: Container(
-                      width: screenWidth * 1.5,
-                      height: screenWidth * 1.5,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          width: 3,
-                          color: const Color(0x99CCF656),
+                        Positioned(
+                          left: sw * 0.1,
+                          top: -sw * 0.7,
+                          child: Container(
+                            width: sw * 1.5,
+                            height: sw * 1.5,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(width: 3, color: const Color(0x99CCF656)),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: screenWidth * 0.4,
-                    top: -screenWidth * 0.45,
-                    child: Container(
-                      width: screenWidth * 1.0,
-                      height: screenWidth * 1.0,
-                      decoration: BoxDecoration(
-                        color: const Color(0x4CCCF656),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          width: 1,
-                          color: const Color(0x99CCF656),
+                        Positioned(
+                          left: sw * 0.4,
+                          top: -sw * 0.45,
+                          child: Container(
+                            width: sw * 1.0,
+                            height: sw * 1.0,
+                            decoration: BoxDecoration(
+                              color: const Color(0x4CCCF656),
+                              shape: BoxShape.circle,
+                              border: Border.all(width: 1, color: const Color(0x99CCF656)),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
 
-                  // Main content (scrollable and aligned toward top)
+                  // ---- Scrollable foreground content ----
                   SingleChildScrollView(
                     padding: EdgeInsets.only(
-                      top: screenHeight * 0.15,
-                      left: screenWidth * 0.08,
-                      right: screenWidth * 0.08,
-                      bottom: screenHeight * 0.2, // Increased bottom padding to avoid overlap
+                      top: sh * 0.15,
+                      left: sw * 0.08,
+                      right: sw * 0.08,
+                      bottom: sh * 0.2,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -119,14 +114,13 @@ class BaseScreen extends StatelessWidget {
                             width: 70,
                           ),
                         ),
-
                         // Title & Subtitle
                         Text(
                           title,
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary,
-                            fontSize: screenWidth * 0.06,
+                            color: Colors.black,
+                            fontSize: sw * 0.06,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -136,14 +130,13 @@ class BaseScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: const Color(0xFF494949),
-                            fontSize: screenWidth * 0.035,
+                            fontSize: sw * 0.035,
                             fontWeight: FontWeight.w400,
                           ),
                         ),
-
                         const SizedBox(height: 30),
 
-                        // Dynamic Content
+                        // Your page-specific widgets
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: contentWidgets,
@@ -152,16 +145,13 @@ class BaseScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Bottom text fixed at the bottom
+                  // ---- Bottom text fixed at bottom (does NOT lift above keyboard) ----
                   if (bottomText != null)
                     Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: screenHeight * 0.02, // Small padding from bottom
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
-                        child: bottomText,
-                      ),
+                      left: sw * 0.08,
+                      right: sw * 0.08,
+                      bottom: 16, // stays fixed; may be covered by keyboard if it opens
+                      child: bottomText!,
                     ),
                 ],
               ),

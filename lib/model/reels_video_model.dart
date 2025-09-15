@@ -1,4 +1,3 @@
-// reels_video_model.dart
 class ReelsVideo {
   final String title;
   final String videoAsset;
@@ -6,4 +5,6 @@ class ReelsVideo {
   bool isPlaying;
 
   ReelsVideo(this.title, this.videoAsset, {this.isLiked = false, this.isPlaying = false});
+
+  static fromJson(e) {}
 }

@@ -1,0 +1,488 @@
+import 'package:country_code_picker/country_code_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:zatch_app/model/user_profile_response.dart';
+import 'package:zatch_app/view/setting_view/change_password_screen.dart';
+import 'change_Info_screen.dart';
+
+class AccountDetailsScreen extends StatefulWidget {
+  final UserProfileResponse? userProfile;
+  final VoidCallback? onBack;
+
+  const AccountDetailsScreen({super.key, this.userProfile, this.onBack});
+
+  @override
+  State<AccountDetailsScreen> createState() => _AccountDetailsScreenState();
+}
+
+class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
+  final _formKey = GlobalKey<FormState>();
+  bool _isFormValid = false;
+
+
+  late TextEditingController _nameController;
+  late TextEditingController _phoneController;
+  late TextEditingController _emailController;
+
+  String gender = "";
+  String _selectedCountryCode = "+91";
+
+  String? _selectedDay;
+  String? _selectedMonth;
+  String? _selectedYear;
+
+  late List<String> _days;
+  final List<String> _months = const [
+    "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
+  ];
+  late List<String> _years;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = widget.userProfile?.user;
+
+    _nameController = TextEditingController(text: user?.username ?? "");
+    _phoneController = TextEditingController(text: user?.phone ?? "");
+    _emailController = TextEditingController(text: user?.email ?? "");
+
+    _nameController.addListener(_validateForm);
+    _phoneController.addListener(_validateForm);
+    _emailController.addListener(_validateForm);
+
+    _selectedCountryCode = user?.countryCode ?? "+91";
+
+    _days = List.generate(31, (i) => (i + 1).toString().padLeft(2, '0'));
+    int currentYear = DateTime.now().year;
+    _years = List.generate(100, (i) => (currentYear - i).toString());
+
+    _validateForm(); // initial check
+  }
+  void _validateForm() {
+    setState(() {
+      _isFormValid =
+          _nameController.text.trim().isNotEmpty &&
+              _phoneController.text.trim().isNotEmpty &&
+              _emailController.text.trim().isNotEmpty;
+    });
+  }
+
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final inputHeight = size.height * 0.06;
+    final inputFontSize = size.width * 0.035;
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade100,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _appBar("Account Details"),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _profileHeader(),
+                        const SizedBox(height: 16),
+                        Divider(height: 1,color: Colors.grey),
+                        const SizedBox(height: 24),
+                        _buildTextField("Name", _nameController),
+                        const SizedBox(height: 16),
+                        _buildLabel("Gender"),
+                        const SizedBox(height: 8),
+                        _genderSelector(),
+                        const SizedBox(height: 16),
+                        _buildLabel("Date of Birth"),
+                        const SizedBox(height: 8),
+                        _dateOfBirthFields(),
+                        const SizedBox(height: 16),
+                        _phoneField(inputHeight, inputFontSize),
+                        const SizedBox(height: 16),
+                        _buildTextField("Email", _emailController),
+                        const SizedBox(height: 16),
+                        _passwordField(),
+                        const SizedBox(height: 30),
+                        _actionButtons(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _appBar(String title) {
+    return AppBar(
+      backgroundColor: Colors.grey.shade100,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.black),
+        onPressed: () {
+          if (widget.onBack != null) widget.onBack!();
+          else if (Navigator.canPop(context)) Navigator.pop(context);
+        },
+      ),
+      centerTitle: true,
+      title: Text(title,
+          style: const TextStyle(
+              fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+    );
+  }
+
+  Widget _profileHeader() {
+    final profilePicUrl = widget.userProfile?.user.profilePic.url ?? "";
+
+    return Row(
+      children: [
+        Stack(
+          children: [
+            CircleAvatar(
+              radius: 40,
+              backgroundImage: profilePicUrl.isNotEmpty
+                  ? NetworkImage(profilePicUrl)
+                  : const NetworkImage(""),
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFA3DD00),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: const Icon(Icons.edit, color: Colors.black, size: 16),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_nameController.text,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 4),
+            Text(_emailController.text,
+                style: const TextStyle(color: Colors.grey, fontSize: 14)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Text(text,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14));
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(label),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.grey.shade100,
+            contentPadding:
+            const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _passwordField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel("Password"),
+        const SizedBox(height: 8),
+        TextFormField(
+          initialValue: "********",
+          readOnly: true,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.grey.shade100,
+            contentPadding:
+            const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            suffix: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ChangePasswordScreen()),
+                );
+              },
+              child: const Text("Change Password",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Color(0xFFA3DD00))),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _genderSelector() {
+    final options = {"Male": Icons.male, "Female": Icons.female, "Other": Icons.transgender};
+    return Row(
+      children: options.entries.map((entry) {
+        final isSelected = gender == entry.key;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() => gender = entry.key),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFFA3DD00) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(entry.value, color: isSelected ? Colors.black : Colors.grey),
+                  const SizedBox(width: 6),
+                  Text(entry.key,
+                      style: TextStyle(
+                          color: isSelected ? Colors.black : Colors.grey,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _dateOfBirthFields() {
+    return Row(
+      children: [
+        _dobDropdown(_days, _selectedDay, "dd", (v) => setState(() => _selectedDay = v)),
+        const SizedBox(width: 8),
+        _dobDropdown(_months, _selectedMonth, "mm", (v) => setState(() => _selectedMonth = v)),
+        const SizedBox(width: 8),
+        _dobDropdown(_years, _selectedYear, "yyyy", (v) => setState(() => _selectedYear = v)),
+      ],
+    );
+  }
+
+  Widget _dobDropdown(List<String> items, String? value, String hint, Function(String?) onChanged) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: DropdownButtonFormField<String>(
+          value: value,
+          decoration: const InputDecoration(border: InputBorder.none),
+          hint: Text(hint, style: const TextStyle(color: Colors.grey)),
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _phoneField(double inputHeight, double inputFontSize) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel("Phone"),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Container(
+              height: inputHeight,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F4F5),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: CountryCodePicker(
+                onChanged: (countryCode) {
+                  setState(() {
+                    _selectedCountryCode = countryCode.dialCode ?? "+91";
+                  });
+                },
+                initialSelection: 'IN',
+                favorite: ['+91', 'IN'],
+                textStyle: TextStyle(color: Colors.black, fontSize: inputFontSize),
+                showFlag: false,
+                showDropDownButton: true,
+                padding: EdgeInsets.zero,
+                dialogTextStyle: TextStyle(fontSize: inputFontSize),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Container(
+                height: inputHeight,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F4F5),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                alignment: Alignment.center,
+                child: TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    hintText: 'Mobile Number',
+                    hintStyle: TextStyle(color: Colors.grey, fontSize: inputFontSize),
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _actionButtons() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            side: const BorderSide(color: Colors.black26),
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: () {
+            if (widget.onBack != null) widget.onBack!();
+            else if (Navigator.canPop(context)) Navigator.pop(context);
+          },
+          child: const Text("Cancel", style: TextStyle(color: Colors.black)),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            backgroundColor: _isFormValid ? const Color(0xFFA3DD00) : Colors.grey,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: _isFormValid
+              ? () {
+            if (_formKey.currentState?.validate() ?? false) {
+              final user = widget.userProfile?.user;
+
+              final oldPhone = user?.phone ?? "";
+              final oldEmail = user?.email ?? "";
+
+              final newPhone = _phoneController.text.trim();
+              final newEmail = _emailController.text.trim();
+
+              bool phoneChanged = newPhone != oldPhone;
+              bool emailChanged = newEmail != oldEmail;
+
+              if (phoneChanged && emailChanged) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChangeInfoScreen(
+                      title: "Verify Your Details",
+                      subtitle: "OTP verification is required for Email & Phone",
+                      showPhone: true,
+                      showEmail: true,
+                      onVerified: () {
+                        _updateProfile(newPhone, newEmail);
+                      },
+                    ),
+                  ),
+                );
+              } else if (phoneChanged) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChangeInfoScreen(
+                      title: "Verify Phone Number",
+                      subtitle: "OTP verification is required for your Phone",
+                      showPhone: true,
+                      showEmail: false,
+                      onVerified: () {
+                        _updateProfile(newPhone, oldEmail);
+                      },
+                    ),
+                  ),
+                );
+              } else if (emailChanged) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChangeInfoScreen(
+                      title: "Verify Email Address",
+                      subtitle: "OTP verification is required for your Email",
+                      showPhone: false,
+                      showEmail: true,
+                      onVerified: () {
+                        _updateProfile(oldPhone, newEmail);
+                      },
+                    ),
+                  ),
+                );
+              } else {
+                _updateProfile(oldPhone, oldEmail);
+              }
+            }
+          }
+              : null,
+          child: const Text(
+            "Save Changes",
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+        ),
+
+      ],
+    );
+  }
+
+  // ✅ FIXED: now inside the State class, so context works
+  void _updateProfile(String phone, String email) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Profile updated successfully!")),
+    );
+  }
+}

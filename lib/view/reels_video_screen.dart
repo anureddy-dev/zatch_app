@@ -67,7 +67,7 @@ class _ReelsVideoScreenState extends State<ReelsVideoScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SizedBox(
-        height: MediaQuery.of(context).size.height, // Ensures definite size
+        height: MediaQuery.of(context).size.height,
         child: PageView.builder(
           controller: _pageController,
           scrollDirection: Axis.vertical,

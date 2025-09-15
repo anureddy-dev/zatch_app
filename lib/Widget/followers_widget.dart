@@ -28,7 +28,10 @@ class _FollowersWidgetState extends State<FollowersWidget> {
               ),
               Text(
                 'See All',
-                style: TextStyle(color: Colors.black),
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -36,67 +39,64 @@ class _FollowersWidgetState extends State<FollowersWidget> {
 
           /// Scrollable Seller List
           SizedBox(
-            height: 140,
+            height: 180,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _controller.followers.length,
               separatorBuilder: (_, __) => const SizedBox(width: 16),
-              itemBuilder: (context, index) {
-                final follower = _controller.followers[index];
-                return Column(
-                  children: [
-                    Stack(
-                      alignment: Alignment.bottomCenter,
-                      children: [
-                        /// Profile Image
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(40),
-                          child: Image.asset(
-                            follower.imageAsset,
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.cover,
-                          ),
+                itemBuilder: (context, index) {
+                  final follower = _controller.followers[index];
+                  return Column(
+                    key: ValueKey(follower.id),
+                    children: [
+                      /// Profile Image
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(40),
+                        child: Image.network(
+                          follower.imageAsset,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
                         ),
+                      ),
+                      const SizedBox(height: 8),
 
-                        /// Overlapping Follow Button
-                        Positioned(
-                          bottom: -8,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                _controller.toggleFollow(index);
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: follower.isFollowing
-                                  ? Colors.grey[400]
-                                  : const Color(0xFFB7DF4B),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 4),
-                              minimumSize: const Size(80, 28),
-                              elevation: 2,
-                            ),
-                            child: Text(
-                              follower.isFollowing ? 'Following ✓' : 'Follow',
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.black),
-                            ),
+                      /// Follow Button (below image)
+                      ElevatedButton(
+                        onPressed: () async {
+                          await _controller.toggleFollow(index);
+                          setState(() {}); // 👈 rebuild only after toggle
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: follower.isFollowing
+                              ? Colors.white
+                              : const Color(0xFFB7DF4B),
+                          shape: const StadiumBorder(),
+                          side: const BorderSide(color: Color(0xFFB7DF4B), width: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          follower.isFollowing ? 'Following ✓' : 'Follow',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16), // spacing for the overlap
-                    Text(
-                      follower.name,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                );
-              },
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      /// Name
+                      Text(
+                        follower.name,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  );
+                }
+
             ),
           ),
         ],

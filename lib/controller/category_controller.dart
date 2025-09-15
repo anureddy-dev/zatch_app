@@ -1,19 +1,28 @@
+import 'package:flutter/material.dart';
+import 'package:zatch_app/model/categories_response.dart';
+import 'package:zatch_app/services/api_service.dart';
 
+class CategoryController extends ChangeNotifier {
+  final ApiService _apiService = ApiService();
 
-import '../model/category_model.dart';
+  List<Category> categories = [];
+  bool isLoading = true;
+  String? errorMessage;
 
-class CategoryController {
-  List<Category> categories = [
-    Category('Explore all', isSelected: true),
-    Category('Fashion'),
-    Category('Technology'),
-    Category('Sneakers'),
-    Category('Watches'),
-  ];
+  /// Fetch categories from API
+  Future<void> fetchCategories() async {
+    try {
+      isLoading = true;
+      errorMessage = null;
+      notifyListeners();
 
-  void selectCategory(String categoryName) {
-    for (var category in categories) {
-      category.isSelected = category.name == categoryName;
+      final fetchedCategories = await _apiService.getCategories();
+      categories = fetchedCategories;
+    } catch (e) {
+      errorMessage = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
     }
   }
 }

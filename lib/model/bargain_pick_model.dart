@@ -1,8 +1,17 @@
 class BargainPick {
   final String title;
   final String subtitle;
-  final String? imageAsset; // Optional image
-  final String? videoAsset; // Optional video
+  final String videoAsset;
+  final String productTitle;
+  final String productPrice;
+  final String thumbnail; // new field
 
-  BargainPick(this.title, this.subtitle, {this.imageAsset, this.videoAsset});
+  BargainPick({
+    required this.title,
+    required this.subtitle,
+    required this.videoAsset,
+    required this.productTitle,
+    required this.productPrice,
+    required this.thumbnail,
+  });
 }

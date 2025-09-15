@@ -1,4 +1,3 @@
-// video_item_model.dart
 class VideoItem {
   final String title;
   final String videoAsset;
