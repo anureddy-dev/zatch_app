@@ -25,6 +25,8 @@ class ApiService {
   final Dio _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
     headers: {"Content-Type": "application/json"},
+    connectTimeout: const Duration(seconds: 200),
+    receiveTimeout: const Duration(seconds: 200),
   ));
 
   String? _token;
@@ -32,25 +34,36 @@ class ApiService {
   /// Initialize service: load token from storage if available
   Future<void> init() async {
     final token = await LocalStorage.getSavedToken();
-    if (token != null) {
+    if (token != null && token.isNotEmpty) {
       setToken(token);
     }
   }
 
   /// Save token and attach to headers
   void setToken(String token) {
+    if (token.isEmpty) return; // avoid overwriting with empty string
     _token = token;
     _dio.options.headers["Authorization"] = "Bearer $token";
     LocalStorage.saveToken(token); // persist for next launch
+  }
+
+  /// Helper: decode response safely
+  dynamic _decodeResponse(dynamic data) {
+    if (data is String) {
+      try {
+        return jsonDecode(data.substring(data.indexOf('{')));
+      } catch (_) {
+        return jsonDecode(data);
+      }
+    }
+    return data;
   }
 
   /// REGISTER
   Future<RegisterResponse> registerUser(RegisterRequest request) async {
     try {
       final response = await _dio.post("/user/register", data: request.toJson());
-      final data = response.data is String
-          ? jsonDecode(response.data.substring(response.data.indexOf('{')))
-          : response.data;
+      final data = _decodeResponse(response.data);
       final registerResponse = RegisterResponse.fromJson(data);
       setToken(registerResponse.token);
       return registerResponse;
@@ -63,7 +76,8 @@ class ApiService {
   Future<LoginResponse> loginUser(LoginRequest request) async {
     try {
       final response = await _dio.post("/user/login", data: request.toJson());
-      final loginResponse = LoginResponse.fromJson(response.data);
+      final data = _decodeResponse(response.data);
+      final loginResponse = LoginResponse.fromJson(data);
       setToken(loginResponse.token);
       return loginResponse;
     } on DioException catch (e) {
@@ -75,9 +89,7 @@ class ApiService {
   Future<VerifyOtpResponse> verifyOtp(VerifyOtpRequest request) async {
     try {
       final response = await _dio.post("/twilio-sms/verify-otp", data: request.toJson());
-      final data = response.data is String
-          ? jsonDecode(response.data.substring(response.data.indexOf('{')))
-          : response.data;
+      final data = _decodeResponse(response.data);
       return VerifyOtpResponse.fromJson(data);
     } on DioException catch (e) {
       throw Exception(_handleError(e));
@@ -88,9 +100,7 @@ class ApiService {
   Future<SendOtpResponse> sendOtp(SendOtpRequest request) async {
     try {
       final response = await _dio.post("/twilio-sms/send-otp", data: request.toJson());
-      final data = response.data is String
-          ? jsonDecode(response.data.substring(response.data.indexOf('{')))
-          : response.data;
+      final data = _decodeResponse(response.data);
       return SendOtpResponse.fromJson(data);
     } on DioException catch (e) {
       throw Exception(_handleError(e));
@@ -101,9 +111,7 @@ class ApiService {
   Future<UserProfileResponse> getUserProfile() async {
     try {
       final response = await _dio.get("/user/profile");
-      final data = response.data is String
-          ? jsonDecode(response.data)
-          : response.data;
+      final data = _decodeResponse(response.data);
       return UserProfileResponse.fromJson(data);
     } on DioException catch (e) {
       throw Exception(_handleError(e));
@@ -114,7 +122,7 @@ class ApiService {
   Future<List<Category>> getCategories() async {
     try {
       final response = await _dio.get("/category");
-      final data = response.data is String ? jsonDecode(response.data) : response.data;
+      final data = _decodeResponse(response.data);
       final categoriesResponse = CategoriesResponse.fromJson(data);
       return categoriesResponse.categories;
     } on DioException catch (e) {
@@ -123,34 +131,33 @@ class ApiService {
   }
 
   /// LIVE SESSIONS
-  Future<List<ReelsVideo>> getLiveSessions() async {
+  Future<List> getLiveSessions() async {
     try {
       final response = await _dio.get("/live/sessions");
-      final List<dynamic> data = response.data["sessions"] ?? [];
-      return data.map((e) => ReelsVideo.fromJson(e)).toList().cast<ReelsVideo>();
+      final data = _decodeResponse(response.data);
+      final sessions = (data["sessions"] ?? []) as List<dynamic>;
+      return sessions.map((e) => ReelsVideo.fromJson(e)).toList();
     } on DioException catch (e) {
       throw Exception(_handleError(e));
     }
   }
 
+  /// TOGGLE FOLLOW
   Future<FollowResponse> toggleFollowUser(String targetUserId) async {
     try {
       final response = await _dio.post("/user/$targetUserId/toggleFollow");
-      final data = response.data is String
-          ? jsonDecode(response.data)
-          : response.data;
+      final data = _decodeResponse(response.data);
       return FollowResponse.fromJson(data);
     } on DioException catch (e) {
       throw Exception(_handleError(e));
     }
   }
+
+  /// PRODUCTS
   Future<List<Product>> getProducts() async {
     try {
       final response = await _dio.get("/product/products");
-      final data = response.data is String
-          ? jsonDecode(response.data)
-          : response.data;
-
+      final data = _decodeResponse(response.data);
       final productResponse = ProductResponse.fromJson(data);
       return productResponse.products;
     } on DioException catch (e) {
@@ -158,26 +165,34 @@ class ApiService {
     }
   }
 
+  /// BITS
   Future<List<Bit>> getBits() async {
-
     try {
       final response = await _dio.get("/bits/list");
-      final data = response.data is String
-          ? jsonDecode(response.data)
-          : response.data;
-
+      final data = _decodeResponse(response.data);
       final bitsResponse = BitsResponse.fromJson(data);
       return bitsResponse.bits;
     } on DioException catch (e) {
       throw Exception(_handleError(e));
     }
   }
+
   /// Common error handler
   String _handleError(DioException e) {
-    if (e.response != null && e.response?.data != null) {
-      return e.response?.data["message"] ?? "Something went wrong!";
-    } else {
-      return e.message ?? "Connection error!";
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+        return "Connection timeout. Please try again.";
+      case DioExceptionType.sendTimeout:
+        return "Send timeout. Please try again.";
+      case DioExceptionType.receiveTimeout:
+        return "Receive timeout. Please try again.";
+      case DioExceptionType.badResponse:
+        return e.response?.data["message"] ?? "Server error occurred.";
+      case DioExceptionType.cancel:
+        return "Request cancelled.";
+      case DioExceptionType.unknown:
+      default:
+        return "Connection error. Please check your internet.";
     }
   }
 }
