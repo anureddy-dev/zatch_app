@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../controller/category_controller.dart';
 import '../model/categories_response.dart';
 
 class CategoryTabsWidget extends StatefulWidget {
   final Function(Category)? onCategorySelected;
-  final List<Category>? selectedCategories; // preselected categories
+  final List<Category>? selectedCategories;
 
   const CategoryTabsWidget({
     super.key,
@@ -19,7 +20,7 @@ class CategoryTabsWidget extends StatefulWidget {
 class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
   final CategoryController _controller = CategoryController();
   List<Category> _orderedCategories = [];
-  String? _selectedCategoryName; // track selected by name
+  String? _selectedCategoryName;
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -31,24 +32,15 @@ class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
 
   Future<void> _loadCategories() async {
     try {
-      await _controller.fetchCategories(); // fetch categories from API
+      await _controller.fetchCategories();
       _orderCategories();
 
-      // Set initial selected category
-      if (widget.selectedCategories != null &&
-          widget.selectedCategories!.isNotEmpty) {
-        // Select the first preselected category
-        _selectedCategoryName = widget.selectedCategories!.first.name;
-      } else if (_orderedCategories.isNotEmpty) {
-        // If no preselected, select the first category
+      // Auto-select first category if nothing is selected (direct Home)
+      if (_orderedCategories.isNotEmpty && _selectedCategoryName == null) {
         _selectedCategoryName = _orderedCategories.first.name;
+        final initialCategory = _orderedCategories.first;
+        widget.onCategorySelected?.call(initialCategory);
       }
-
-      // Trigger callback for initial selection
-      final initialCategory = _orderedCategories.firstWhere(
-              (c) => c.name == _selectedCategoryName,
-          orElse: () => _orderedCategories.first);
-      widget.onCategorySelected?.call(initialCategory);
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -60,38 +52,74 @@ class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
 
   void _orderCategories() {
     final allCategories = _controller.categories ?? [];
-
     if (allCategories.isEmpty) return;
 
-    if (widget.selectedCategories != null &&
-        widget.selectedCategories!.isNotEmpty) {
-      final selectedSet =
-      widget.selectedCategories!.map((c) => c.name).toSet();
+    // Sort API categories by sortOrder then name
+    allCategories.sort((a, b) {
+      final orderA = a.sortOrder ?? 9999;
+      final orderB = b.sortOrder ?? 9999;
+      if (orderA != orderB) return orderA.compareTo(orderB);
+      return a.name.compareTo(b.name);
+    });
 
-      final selectedFirst =
-      allCategories.where((c) => selectedSet.contains(c.name)).toList();
-      final remaining =
-      allCategories.where((c) => !selectedSet.contains(c.name)).toList();
+    if (widget.selectedCategories != null && widget.selectedCategories!.isNotEmpty) {
+      final selectedNames = widget.selectedCategories!.map((c) => c.name.toLowerCase()).toList();
 
-      _orderedCategories = [...selectedFirst, ...remaining];
+      final exploreAll = allCategories.firstWhere(
+            (c) => c.name.toLowerCase() == "explore all",
+        orElse: () => Category(name: "Explore All", id: "", easyname: ""),
+      );
+
+      // Remaining categories (excluding selected and Explore All)
+      final remaining = allCategories.where((c) {
+        final nameLower = c.name.toLowerCase();
+        return !selectedNames.contains(nameLower) && nameLower != "explore all";
+      }).toList();
+
+      final isExploreSelected = selectedNames.contains("explore all");
+
+      if (widget.selectedCategories!.length == 1) {
+        // Single selection
+        final singleSelected = widget.selectedCategories!.first;
+        if (singleSelected.name.toLowerCase() == "explore all") {
+          _orderedCategories = [singleSelected, ...remaining];
+        } else {
+          _orderedCategories = [singleSelected];
+          if (!isExploreSelected) _orderedCategories.add(exploreAll);
+          _orderedCategories.addAll(remaining);
+        }
+        _selectedCategoryName = singleSelected.name;
+      } else {
+        // Multiple selections
+        _orderedCategories = [];
+
+        // Always put Explore All first if selected, else not
+        if (isExploreSelected) {
+          _orderedCategories.add(exploreAll);
+          _selectedCategoryName = exploreAll.name; // mark Explore All selected
+        }
+
+        // Add other selected categories (excluding Explore All)
+        _orderedCategories.addAll(
+          widget.selectedCategories!.where((c) => c.name.toLowerCase() != "explore all"),
+        );
+
+        // Add remaining categories
+        _orderedCategories.addAll(remaining);
+      }
     } else {
+      // Direct Home entry → show API sorted categories, no pre-selection
       _orderedCategories = allCategories;
+      _selectedCategoryName = null;
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_errorMessage != null) {
-      return Center(child: Text("Error: $_errorMessage"));
-    }
-
-    if (_orderedCategories.isEmpty) {
-      return const Center(child: Text("No categories available"));
-    }
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_errorMessage != null) return Center(child: Text("Error: $_errorMessage"));
+    if (_orderedCategories.isEmpty) return const Center(child: Text("No categories available"));
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
@@ -103,19 +131,23 @@ class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
             return Padding(
               padding: const EdgeInsets.only(right: 8.0),
               child: GestureDetector(
-                onTap: () {
+                onTap: () async {
                   setState(() {
                     _selectedCategoryName = category.name;
                   });
+
+                  // Save new selection
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setStringList("userCategories", [category.name]);
+
                   widget.onCategorySelected?.call(category);
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
-                  padding:
-                  const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                   decoration: BoxDecoration(
                     color: isSelected ? Colors.black : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(20.0),
+                    borderRadius: BorderRadius.circular(10.0),
                   ),
                   child: Text(
                     category.name,

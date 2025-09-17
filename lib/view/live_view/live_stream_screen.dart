@@ -3,13 +3,15 @@ import 'package:zatch_app/controller/live_stream_controller.dart';
 import 'package:zatch_app/model/carts_model.dart';
 import 'package:zatch_app/model/live_follower_model.dart';
 import 'package:zatch_app/model/product_model.dart';
+import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
 import 'package:zatch_app/view/zatching_details_screen.dart';
 
 class LiveStreamScreen extends StatefulWidget {
   final LiveFollowerModel user;
+  final UserProfileResponse? userProfile;
 
-  const LiveStreamScreen({super.key, required this.user});
+  const LiveStreamScreen( {super.key, required this.user, this.userProfile});
 
   @override
   State<LiveStreamScreen> createState() => _LiveStreamScreenState();
@@ -707,8 +709,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
           minimumSize: const Size.fromHeight(45),
           ),
           onPressed: () {
-          Navigator.pop(context); // close bottom sheet first
-
+          Navigator.pop(context);
           if (selectedOption == "buy") {
           // Navigate to Checkout screen
           Navigator.push(

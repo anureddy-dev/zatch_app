@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zatch_app/model/categories_response.dart';
 import 'package:zatch_app/model/login_response.dart';
 import 'package:zatch_app/services/api_service.dart';
@@ -6,11 +7,11 @@ import 'package:zatch_app/view/category_screen/simple_base_screen.dart';
 import 'package:zatch_app/view/home_page.dart';
 
 class CategoryScreen extends StatefulWidget {
-  final LoginResponse loginResponse; // Move it here
+  final LoginResponse loginResponse;
 
   const CategoryScreen({
     super.key,
-    required this.loginResponse, // required parameter
+    required this.loginResponse,
   });
 
   @override
@@ -61,6 +62,28 @@ class _CategoryScreenState extends State<CategoryScreen> {
         selectedIndexes.add(index);
       }
     });
+  }
+
+  Future<void> _saveCategoriesAndContinue() async {
+    final selectedItems = selectedIndexes.map((i) => categories[i]).toList();
+
+    // ✅ Save categories locally
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      "userCategories",
+      selectedItems.map((c) => c.name).toList(),
+    );
+
+    // ✅ Navigate to HomePage
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HomePage(
+          loginResponse: widget.loginResponse,
+          selectedCategories: selectedItems,
+        ),
+      ),
+    );
   }
 
   @override
@@ -155,28 +178,11 @@ class _CategoryScreenState extends State<CategoryScreen> {
           ),
       ],
       bottomText: ElevatedButton(
-        onPressed: selectedIndexes.isNotEmpty
-            ? () {
-          final selectedItems = selectedIndexes
-              .map((i) => categories[i])
-              .toList(); // full Category objects
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => HomePage(
-                loginResponse: widget.loginResponse,
-                selectedCategories: selectedItems,
-              ),
-            ),
-          );
-        }
-            : null,
+        onPressed: selectedIndexes.isNotEmpty ? _saveCategoriesAndContinue : null,
         style: ElevatedButton.styleFrom(
           minimumSize: const Size(double.infinity, 50),
-          backgroundColor: selectedIndexes.isNotEmpty
-              ? const Color(0xFFCCFF55)
-              : Colors.grey,
+          backgroundColor:
+          selectedIndexes.isNotEmpty ? const Color(0xFFCCFF55) : Colors.grey,
           foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),

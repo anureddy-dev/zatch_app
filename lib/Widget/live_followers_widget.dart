@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:zatch_app/controller/live_follower_controller.dart';
+import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/view/live_view/live_stream_screen.dart';
 
-class LiveFollowersWidget extends StatelessWidget {
-  LiveFollowersWidget({super.key});
+class LiveFollowersWidget extends StatefulWidget {
+  UserProfileResponse? userProfile;
+  LiveFollowersWidget({super.key, this.userProfile});
+
+  @override
+  State<LiveFollowersWidget> createState() => _LiveFollowersWidgetState();
+}
+
+class _LiveFollowersWidgetState extends State<LiveFollowersWidget> {
   final LiveFollowerController controller = LiveFollowerController();
 
   @override
@@ -47,7 +55,7 @@ class LiveFollowersWidget extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => LiveStreamScreen(user: user),
+                      builder: (_) => LiveStreamScreen(user: user,userProfile:widget.userProfile),
                     ),
                   );
                 },

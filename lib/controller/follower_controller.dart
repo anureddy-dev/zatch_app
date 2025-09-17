@@ -21,8 +21,9 @@ class FollowerController {
     final follower = followers[index];
     try {
       final res = await _api.toggleFollowUser(follower.id);
-      //print("Toggled follow: ${res.message}, now following: ${res.isFollowing}");
-     // followers[index] = follower.copyWith(isFollowing: res.isFollowing);
+      final newIsFollowing = !follower.isFollowing;
+      print("Toggled follow: ${res.message}, now following: $newIsFollowing");
+      followers[index] = follower.copyWith(isFollowing: newIsFollowing);
     } catch (e) {
       print("Toggle follow failed: $e");
     }

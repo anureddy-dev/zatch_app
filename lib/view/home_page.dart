@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:zatch_app/Widget/category_tabs_widget.dart';
 import 'package:zatch_app/model/categories_response.dart';
 import 'package:zatch_app/model/login_response.dart';
+import 'package:zatch_app/model/user_profile_response.dart';
+import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/setting_view/account_setting_screen.dart';
 import 'package:zatch_app/view/zatch_ai_screen.dart';
 import '../Widget/Header.dart';
@@ -14,7 +16,7 @@ import 'navigation_page.dart';
 
 class HomePage extends StatefulWidget {
   final LoginResponse? loginResponse;
-  final List<Category>? selectedCategories;
+  final List<Category>? selectedCategories; // Only used if coming from CategoryScreen
 
   const HomePage({
     super.key,
@@ -28,6 +30,10 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
+  final ApiService _apiService = ApiService();
+  UserProfileResponse? userProfile;
+  bool isLoading = true;
+  String? error;
 
   bool _showAccountDetails = false;
 
@@ -38,11 +44,37 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  @override
+  void initState() {
+    super.initState();
+    fetchUserProfile();
+  }
+
+  Future<void> fetchUserProfile() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
+
+    try {
+      final profileModel = await _apiService.getUserProfile();
+      setState(() {
+        userProfile = profileModel;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        error = e.toString();
+        isLoading = false;
+      });
+    }
+  }
+
   Widget _buildHomeTab() {
     return Column(
       children: [
         const SizedBox(height: 25),
-        HeaderWidget(widget.loginResponse),
+        HeaderWidget(userProfile),
         Expanded(
           child: SingleChildScrollView(
             child: Column(
@@ -50,13 +82,14 @@ class _HomePageState extends State<HomePage> {
               children: [
                 const SizedBox(height: 16),
                 CategoryTabsWidget(
-                  selectedCategories: widget.selectedCategories ?? [],
+                  selectedCategories: widget.selectedCategories?.isNotEmpty == true
+                      ? widget.selectedCategories // from CategoryScreen
+                      : null, // Direct Home entry
                   onCategorySelected: (category) {
                     debugPrint("Selected Category: ${category.name}");
                   },
                 ),
-
-                LiveFollowersWidget(),
+                LiveFollowersWidget(userProfile: userProfile),
                 const BargainPicksWidget(),
                 const FollowersWidget(),
                 const TopPicksThisWeekWidget(),
@@ -79,14 +112,13 @@ class _HomePageState extends State<HomePage> {
           _buildHomeTab(),
           const Center(child: Text("Bookmarks")),
           const Center(child: Text("Settings")),
-           AccountSettingsScreen(),
+          AccountSettingsScreen(),
         ],
       ),
       bottomNavigationBar: CustomBottomNavBar(
         selectedIndex: _selectedIndex,
         onItemTapped: _onItemTapped,
       ),
-
       floatingActionButton: FloatingZButton(
         onPressed: () {
           Navigator.push(
@@ -98,5 +130,4 @@ class _HomePageState extends State<HomePage> {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
-
 }

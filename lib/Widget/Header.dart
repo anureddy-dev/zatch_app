@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/login_response.dart';
+import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/view/search_view/search_screen.dart';
 
 class HeaderWidget extends StatelessWidget {
-  final LoginResponse? loginResponse; // ✅ store the loginResponse
+  UserProfileResponse? userProfile;
 
-  const HeaderWidget(this.loginResponse, {super.key});
+   HeaderWidget(this.userProfile, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +40,7 @@ class HeaderWidget extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     // ✅ Use name from LoginResponse
-                    loginResponse?.user.username ?? '',
+                    userProfile?.user.username ?? '',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

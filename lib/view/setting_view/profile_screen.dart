@@ -68,7 +68,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                       // ✅ Name
                       Text(
-                        name,
+                        name??"",
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 6),

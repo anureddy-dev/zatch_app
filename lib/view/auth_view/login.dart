@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zatch_app/controller/auth_controller/login_controller.dart';
+import 'package:zatch_app/model/categories_response.dart';
 import 'package:zatch_app/view/category_screen/category_screen.dart';
 import 'package:zatch_app/view/home_page.dart';
 import '../../utils/auth_utils/base_screen.dart';
@@ -22,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final LoginController _loginController = LoginController();
 
-  Future<void> _handleLogin() async {
+  /*Future<void> _handleLogin() async {
     setState(() => _isLoading = true);
     try {
       final res = await _loginController.loginUser(
@@ -41,12 +43,52 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
 
-      /*Navigator.pushReplacement(
+      *//*Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => HomePage(loginResponse: res),
         ),
-      );*/
+      );*//*
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }*/
+
+  Future<void> _handleLogin() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await _loginController.loginUser(
+        phone: _phoneController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      final selectedCategories = prefs.getStringList("userCategories") ?? [];
+
+      if (selectedCategories.isEmpty) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CategoryScreen(loginResponse: res),
+          ),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HomePage(
+              loginResponse: res,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -57,6 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
 
   Future<void> _handleOtpLogin() async {
     setState(() => _isLoading = true);
