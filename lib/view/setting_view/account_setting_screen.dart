@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/services/api_service.dart';
+import 'package:zatch_app/services/preference_service.dart';
 import 'package:zatch_app/view/help_screen.dart';
 import 'package:zatch_app/view/order_view/order_screen.dart';
 import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
@@ -39,6 +40,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
     try {
       final profileModel = await _apiService.getUserProfile();
+      print("Profile Response: $profileModel");
       setState(() {
         userProfile = profileModel;
         isLoading = false;
@@ -169,7 +171,27 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                             );
                           },
                         ),
-                        _settingsTile(Icons.logout, "Log out", () {}),
+                        _settingsTile(Icons.logout, "Log out", () async {
+                          setState(() => isLoading = true);
+                          final prefs = PreferenceService();
+
+                          try {
+                            await _apiService.logoutUser();
+                            await prefs.logoutAll();
+
+                            if (!mounted) return;
+                            Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Logout failed: $e")),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => isLoading = false);
+                          }
+                        }),
+
                       ],
                     ),
                   ),

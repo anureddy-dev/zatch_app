@@ -1,15 +1,16 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
+import 'package:zatch_app/model/user_profile_response.dart';
+import 'package:zatch_app/services/api_service.dart';
+import 'package:zatch_app/view/auth_view/login.dart';
+import 'package:zatch_app/view/setting_view/account_setting_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
-  final String name;
-  final String email;
-  final String avatarUrl;
+  final UserProfileResponse? userProfile;
 
   const ChangePasswordScreen({
     super.key,
-    this.name = "Raju Nikil",
-    this.email = "d.v.a.v.raju@gmail.com",
-    this.avatarUrl = "https://i.pravatar.cc/150?img=12",
+    this.userProfile,
   });
 
   @override
@@ -25,8 +26,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _obscCur = true;
   bool _obscNew = true;
   bool _obscCon = true;
+  bool _isLoading = false;
 
   static const brandGreen = Color(0xFFA3DD00);
+
+  final ApiService _apiService = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    // Prefill current password if available (optional)
+    _currentCtrl.text = widget.userProfile?.user.password ?? "";
+  }
 
   String? _validateNew(String? v) {
     final s = v?.trim() ?? "";
@@ -35,9 +46,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final hasLetter = RegExp(r'[A-Za-z]').hasMatch(s);
     final hasDigit = RegExp(r'\d').hasMatch(s);
     if (!hasLetter || !hasDigit) return "Use letters & numbers";
-    if (_currentCtrl.text.trim() == s) {
-      return "New password must differ from current";
-    }
     return null;
   }
 
@@ -47,13 +55,80 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return null;
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
-      // TODO: connect to backend
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password changed successfully")),
+  Future<void> _handleChangePassword() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await _apiService.changePassword(
+        newPassword: _newCtrl.text.trim(),
+        confirmPassword: _confirmCtrl.text.trim(),
       );
-      Navigator.pop(context);
+
+      if (response['success'] == true) {
+        // ✅ Show success Flushbar
+        Flushbar(
+          title: "Success",
+          message: response['message'] ?? 'Password changed successfully!',
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.green,
+          margin: const EdgeInsets.all(8),
+          borderRadius: BorderRadius.circular(8),
+          icon: const Icon(
+            Icons.check_circle_outline,
+            size: 28.0,
+            color: Colors.white,
+          ),
+          flushbarPosition: FlushbarPosition.TOP,
+        ).show(context);
+
+        _newCtrl.clear();
+        _confirmCtrl.clear();
+        _currentCtrl.clear();
+
+          if (mounted) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => LoginScreen()),
+                  (route) => false, // removes all previous routes
+            );
+          }
+      } else {
+        // ❌ Show error Flushbar
+        Flushbar(
+          title: "Error",
+          message: response['message'] ?? 'Failed to change password',
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.red,
+          margin: const EdgeInsets.all(8),
+          borderRadius: BorderRadius.circular(8),
+          icon: const Icon(
+            Icons.error_outline,
+            size: 28.0,
+            color: Colors.white,
+          ),
+          flushbarPosition: FlushbarPosition.TOP,
+        ).show(context);
+      }
+    } catch (e) {
+      // ❌ Show error Flushbar for exceptions
+      Flushbar(
+        title: "Error",
+        message: e.toString(),
+        duration: const Duration(seconds: 3),
+        backgroundColor: Colors.red,
+        margin: const EdgeInsets.all(8),
+        borderRadius: BorderRadius.circular(8),
+        icon: const Icon(
+          Icons.error_outline,
+          size: 28.0,
+          color: Colors.white,
+        ),
+        flushbarPosition: FlushbarPosition.TOP,
+      ).show(context);
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -68,7 +143,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F2), // light background like screenshot
+      backgroundColor: const Color(0xFFF2F2F2),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -88,7 +163,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           key: _formKey,
           child: Column(
             children: [
-              // Main Card (Profile + Inputs)
+              // Main Card
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -110,18 +185,20 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       children: [
                         CircleAvatar(
                           radius: 26,
-                          backgroundImage: NetworkImage(widget.avatarUrl),
+                          backgroundImage: NetworkImage(
+                            widget.userProfile?.user.profilePic.url ?? "",
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(widget.name,
+                              Text(widget.userProfile?.user.username ?? "",
                                   style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16)),
-                              Text(widget.email,
+                              Text(widget.userProfile?.user.email ?? "",
                                   style: const TextStyle(
                                       color: Colors.grey, fontSize: 13)),
                             ],
@@ -132,7 +209,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
                     const SizedBox(height: 16),
                     const Divider(thickness: 1, color: Color(0xFFEAEAEA)),
-
                     const SizedBox(height: 16),
 
                     // Current password
@@ -155,7 +231,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       controller: _newCtrl,
                       obscureText: _obscNew,
                       decoration: _inputDecoration(
-                        label: "Enter Password",
+                        label: "Enter New Password",
                         toggle: () => setState(() => _obscNew = !_obscNew),
                         obscured: _obscNew,
                       ),
@@ -168,7 +244,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       controller: _confirmCtrl,
                       obscureText: _obscCon,
                       decoration: _inputDecoration(
-                        label: "Re-Enter Password",
+                        label: "Re-Enter New Password",
                         toggle: () => setState(() => _obscCon = !_obscCon),
                         obscured: _obscCon,
                       ),
@@ -186,7 +262,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               side: const BorderSide(color: brandGreen, width: 1.5),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(30)),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              padding:
+                              const EdgeInsets.symmetric(vertical: 14),
                             ),
                             child: const Text("Cancel",
                                 style: TextStyle(color: Colors.black)),
@@ -195,24 +272,41 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+
+                    // ✅ Save Changes button with API call
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _submit,
+                        onPressed: _isLoading ? null : _handleChangePassword,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: brandGreen,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding:
+                          const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: const Text("Save Changes"),
+                        child: _isLoading
+                            ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.black,
+                            strokeWidth: 2,
+                          ),
+                        )
+                            : const Text(
+                          "Save Changes",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-
             ],
           ),
         ),
@@ -226,7 +320,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     required bool obscured,
   }) {
     return InputDecoration(
-      hintText: label, // matches screenshot (placeholder style)
+      hintText: label,
       filled: true,
       fillColor: const Color(0xFFF6F6F6),
       border: OutlineInputBorder(
@@ -237,7 +331,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         icon: Icon(obscured ? Icons.visibility_off : Icons.visibility),
         onPressed: toggle,
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding:
+      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 }

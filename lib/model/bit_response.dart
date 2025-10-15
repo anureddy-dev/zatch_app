@@ -23,55 +23,41 @@ class BitsResponse {
 
 class Bit {
   final String id;
-  final String title;
-  final String description;
-  final String userId;
-  final List<String> likes;
-  final int likeCount;
-  final String shareLink;
-  final DateTime createdAt;
-  final Video video;
+  final String? image;
+  final String? video;
+  final String? title;
+  final String? category;
+  final String? price;
+  final String? rating;
+  final bool? isLive;
 
   Bit({
     required this.id,
-    required this.title,
-    required this.description,
-    required this.userId,
-    required this.likes,
-    required this.likeCount,
-    required this.shareLink,
-    required this.createdAt,
-    required this.video,
+    this.image,
+    this.video,
+    this.title,
+    this.category,
+    this.price,
+    this.rating,
+    this.isLive,
   });
 
-  factory Bit.fromJson(Map<String, dynamic> json) {
-    return Bit(
-      id: json['_id'] ?? '',
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
-      userId: json['userId'] ?? '',
-      likes: (json['likes'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList() ??
-          [],
-      likeCount: json['likeCount'] ?? 0,
-      shareLink: json['shareLink'] ?? '',
-      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
-      video: Video.fromJson(json['video'] ?? {}),
-    );
-  }
+  factory Bit.fromJson(Map<String, dynamic> json) => Bit(
+    id: json['_id'],
+    image: json['image'],
+    video: json['video'],
+    title: json['title'],
+    category: json['category'],
+    price: json['price'],
+    rating: json['rating'],
+    isLive: json['isLive'] ?? false,
+  );
+  String get mediaPath => video ?? image ?? '';
+  bool get isVideo => video != null && video!.isNotEmpty;
+  String get displayTitle => title ?? '';
+  String get displayCategory => category ?? '';
+  String get displayPrice => price ?? '';
+  String get displayRating => rating ?? '0';
+  bool get liveStatus => isLive ?? false;
 }
 
-class Video {
-  final String publicId;
-  final String url;
-
-  Video({required this.publicId, required this.url});
-
-  factory Video.fromJson(Map<String, dynamic> json) {
-    return Video(
-      publicId: json['public_id'] ?? '',
-      url: json['url'] ?? '',
-    );
-  }
-}

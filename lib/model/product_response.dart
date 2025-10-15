@@ -15,7 +15,7 @@ class ProductResponse {
     return ProductResponse(
       success: json['success'] ?? false,
       message: json['message'] ?? '',
-      products: (json['products'] as List<dynamic>)
+      products: (json['products'] as List<dynamic>? ?? [])
           .map((e) => Product.fromJson(e))
           .toList(),
     );
@@ -35,6 +35,11 @@ class Product {
   final String? size;
   final String? info1;
   final String? info2;
+  final bool? isTopPick;
+  final int? saveCount;
+        int? likeCount;
+  final int? viewCount;
+  final String? sellerId;
 
   Product({
     required this.id,
@@ -49,19 +54,26 @@ class Product {
     this.size,
     this.info1,
     this.info2,
+    this.isTopPick,
+    this.saveCount,
+    this.likeCount,
+    this.viewCount,
+    this.sellerId,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
-      id: json['_id'],
+      id: json['_id'] ?? '',
       name: json['name'] ?? '',
       description: json['description'] ?? '',
-      price: (json['price'] as num).toDouble(),
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
       images: (json['images'] as List<dynamic>? ?? [])
           .map((e) => ProductImage.fromJson(e))
           .toList(),
       category: json['category'] != null
+          ? (json['category'] is Map
           ? Category.fromJson(json['category'])
+          : null)
           : null,
       stock: json['stock'],
       condition: json['condition'],
@@ -69,7 +81,22 @@ class Product {
       size: json['size'],
       info1: json['info1'],
       info2: json['info2'],
+      isTopPick: json['isTopPick'] ?? false,
+      saveCount: json['saveCount'] ?? 0,
+      likeCount: json['likeCount'] ?? 0,
+      viewCount: json['viewCount'] ?? 0,
+      sellerId: json['sellerId'],
     );
+  }
+
+  /// Returns a list of available colors (for compatibility with UI)
+  List<String> get availableColors {
+    return color != null ? [color!] : ['Black', 'Grey', 'Blue'];
+  }
+
+  /// Returns a list of available sizes (for compatibility with UI)
+  List<String> get availableSizes {
+    return size != null ? [size!] : ['S', 'M', 'L', 'XL'];
   }
 }
 
@@ -92,43 +119,3 @@ class ProductImage {
     );
   }
 }
-
-/*class Category {
-  final String id;
-  final String name;
-  final String slug;
-  final CategoryImage image;
-
-  Category({
-    required this.id,
-    required this.name,
-    required this.slug,
-    required this.image,
-  });
-
-  factory Category.fromJson(Map<String, dynamic> json) {
-    return Category(
-      id: json['_id'],
-      name: json['name'] ?? '',
-      slug: json['slug'] ?? '',
-      image: CategoryImage.fromJson(json['image']),
-    );
-  }
-}
-
-class CategoryImage {
-  final String publicId;
-  final String url;
-
-  CategoryImage({
-    required this.publicId,
-    required this.url,
-  });
-
-  factory CategoryImage.fromJson(Map<String, dynamic> json) {
-    return CategoryImage(
-      publicId: json['public_id'] ?? '',
-      url: json['url'] ?? '',
-    );
-  }
-}*/

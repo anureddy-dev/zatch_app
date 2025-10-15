@@ -1,3 +1,4 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zatch_app/controller/auth_controller/otp_controller.dart';
@@ -39,9 +40,31 @@ class _OtpScreenRegisterState extends State<OtpScreenRegister> {
   @override
   void dispose() {
     for (var c in _controllers) c.dispose();
-    for (var f in _focusNodes) f.dispose();
+    for (var f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
+
+  /// Custom message handler using Flushbar
+  void _showMessage(String title, String message, {bool isError = true}) {
+    if (!mounted) return;
+    Flushbar(
+      title: title,
+      message: message,
+      duration: const Duration(seconds: 3),
+      backgroundColor: isError ? Colors.red : Colors.green,
+      margin: const EdgeInsets.all(8),
+      borderRadius: BorderRadius.circular(8),
+      icon: Icon(
+        isError ? Icons.error_outline : Icons.check_circle_outline,
+        size: 28.0,
+        color: Colors.white,
+      ),
+      flushbarPosition: FlushbarPosition.TOP,
+    ).show(context);
+  }
+
 
   /// Auto-send OTP on screen load
   Future<void> _sendOtpOnStart() async {
@@ -50,9 +73,11 @@ class _OtpScreenRegisterState extends State<OtpScreenRegister> {
     if (!mounted) return;
 
     setState(() => _isLoading = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(res != null ? "OTP sent to ${res.to}" : "Failed to send OTP")),
-    );
+    if (res != null) {
+      _showMessage("Success", "OTP sent to ${res.to}", isError: false);
+    } else {
+      _showMessage("Error", "Failed to send OTP");
+    }
     _startResendTimer();
   }
 
@@ -69,9 +94,11 @@ class _OtpScreenRegisterState extends State<OtpScreenRegister> {
     if (!mounted) return;
 
     setState(() => _isLoading = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(res != null ? "OTP resent to ${res.to}" : "Failed to resend OTP")),
-    );
+    if (res != null) {
+      _showMessage("Success", "OTP resent to ${res.to}", isError: false);
+    } else {
+      _showMessage("Error", "Failed to resend OTP");
+    }
 
     _startResendTimer();
   }
@@ -80,9 +107,7 @@ class _OtpScreenRegisterState extends State<OtpScreenRegister> {
   Future<void> _verifyOtp() async {
     final otp = _controllers.map((c) => c.text).join();
     if (otp.length != 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter the 4-digit OTP")),
-      );
+      _showMessage("Invalid Input", "Please enter the 4-digit OTP");
       return;
     }
 
@@ -92,9 +117,7 @@ class _OtpScreenRegisterState extends State<OtpScreenRegister> {
 
     setState(() => _isLoading = false);
     if (res != null && res.valid == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ OTP Verified Successfully")),
-      );
+      _showMessage("Success", "✅ OTP Verified Successfully", isError: false);
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -102,9 +125,7 @@ class _OtpScreenRegisterState extends State<OtpScreenRegister> {
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("OTP Failed. Status: ${res?.status}")),
-      );
+      _showMessage("Verification Failed", "OTP is incorrect or has expired. Please try again.");
     }
 
   }

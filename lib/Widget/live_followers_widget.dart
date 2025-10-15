@@ -1,191 +1,147 @@
 import 'package:flutter/material.dart';
 import 'package:zatch_app/controller/live_follower_controller.dart';
+import 'package:zatch_app/model/live_session_res.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
-import 'package:zatch_app/view/live_view/live_stream_screen.dart';
+import 'package:zatch_app/view/live_view/see_all_live_screen.dart';
+
+import '../view/live_view/live_session_card.dart';
 
 class LiveFollowersWidget extends StatefulWidget {
-  UserProfileResponse? userProfile;
-  LiveFollowersWidget({super.key, this.userProfile});
+  final UserProfileResponse? userProfile;
+  const LiveFollowersWidget({super.key, this.userProfile});
 
   @override
   State<LiveFollowersWidget> createState() => _LiveFollowersWidgetState();
 }
 
 class _LiveFollowersWidgetState extends State<LiveFollowersWidget> {
-  final LiveFollowerController controller = LiveFollowerController();
+  final LiveFollowerController _controller = LiveFollowerController();
+
+  List<Session> _liveSessions = [];
+  bool _isLoading = true;
+  String? _error;
+
+  final double cardWidth = 131.0;
+  final double cardHeight = 158.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLiveUsers();
+  }
+
+  // Use a finally block for cleaner state management
+  Future<void> _loadLiveUsers() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final sessions = await _controller.getLiveSessions();
+      if (mounted) {
+        setState(() {
+          _liveSessions = sessions;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _liveSessions = [];
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    const double listHeight = 170;
+
+    // Show a loading indicator for the horizontal list
+    if (_isLoading) {
+      return SizedBox(
+        height: listHeight + 50, // Height for header + list
+        child: Center(
+          child: CircularProgressIndicator(color: Color(0xFFA3DD00)),
+        ),
+      );
+    }
+
+    // Don't show the widget if there are no sessions or an error
+    if (_liveSessions.isEmpty) {
+      // You can return an empty container or a message
+      return const SizedBox.shrink();
+    }
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        /// Header Row
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                "Live From Followers",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              GestureDetector(
-                onTap: () {
-                },
-                child: const Text(
-                  "See All",
-                  style: TextStyle(color: Colors.blue),
+                "Live from followers",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
               ),
-
-            ],
-          ),
-        ),
-
-        /// Horizontal Scroll
-        SizedBox(
-          height: 220,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: controller.liveUsers.length,
-            itemBuilder: (context, index) {
-              final user = controller.liveUsers[index];
-
-              return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => LiveStreamScreen(user: user,userProfile:widget.userProfile),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 16),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Stack(
-                      children: [
-                        /// Background Image
-                        Container(
-                          height: 220,
-                          width: 140,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            image: DecorationImage(
-                              image: NetworkImage(user.image),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
+              // --- CHANGE #1: Only show "See All" if there are more than 3 items ---
+              if (_liveSessions.length > 3)
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SeeAllLiveScreen(
+                          liveSessions: _liveSessions, // Pass the FULL list
                         ),
-
-                        /// Live Tag
-                        Positioned(
-                          top: 10,
-                          left: 10,
-                          child: Container(
-                            padding:
-                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.greenAccent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text(
-                              "Live · 465",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        /// User Info Bottom
-                        Positioned(
-                          bottom: 10,
-                          left: 10,
-                          right: 10,
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 14,
-                                backgroundImage: NetworkImage(user.image),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded( // 👈 prevents overflow
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      user.name,
-                                      overflow: TextOverflow.ellipsis, // 👈 adds "..."
-                                      maxLines: 1,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      user.category,
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 10,
-                          left: 10,
-                          right: 10,
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 14,
-                                backgroundImage: NetworkImage(user.image),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded( // 👈 prevents overflow
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      user.name,
-                                      overflow: TextOverflow.ellipsis, // 👈 adds "..."
-                                      maxLines: 1,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      user.category,
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-
-                      ],
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    "See All",
+                    style: TextStyle(
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: cardHeight,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            // --- CHANGE #2: Limit the item count to a maximum of 3 ---
+            itemCount: _liveSessions.length > 3 ? 3 : _liveSessions.length,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            itemBuilder: (context, index) {
+              final liveSession = _liveSessions[index];
+
+              return Padding(
+                padding: EdgeInsets.only(
+                    right: (index == _liveSessions.length - 1 || index == 2) ? 0 : 12),
+                child: LiveSessionCard(
+                  liveSession: liveSession,
+                  width: cardWidth,
+                  height: cardHeight,
+                ),
               );
-            }
-                      ),
+            },
+          ),
         ),
       ],
     );

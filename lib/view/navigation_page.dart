@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:zatch_app/model/user_profile_response.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onItemTapped;
+  final UserProfileResponse? userProfile;
 
   const CustomBottomNavBar({
     super.key,
     required this.selectedIndex,
-    required this.onItemTapped,
+    required this.onItemTapped, this.userProfile,
   });
 
   @override
@@ -31,26 +33,54 @@ class CustomBottomNavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.home_filled, 0, selectedIndex == 0),
-          _buildNavItem(Icons.bookmark_border, 1, selectedIndex == 1),
-          const SizedBox(width: 40), // Space for center FAB
-          _buildNavItem(Icons.settings_rounded, 2, selectedIndex == 2),
-          _buildProfileItem(3, selectedIndex == 3),
+          _buildNavItem(
+            icon: Icons.home_filled,
+            index: 0,
+            isSelected: selectedIndex == 0,
+          ),
+          _buildNavItem(
+            imagePath: "assets/images/search.png",
+            index: 1,
+            isSelected: selectedIndex == 1,
+          ),
+          const SizedBox(width: 40),
+          _buildNavItem(
+            imagePath: "assets/images/holding.png",
+            index: 2,
+            isSelected: selectedIndex == 2,
+          ),
+          _buildProfileItem(
+            3,
+            selectedIndex == 3,
+          ),
         ],
+      ),
+
+    );
+  }
+
+  Widget _buildNavItem({
+    IconData? icon,
+    String? imagePath,
+    required int index,
+    required bool isSelected,
+  }) {
+    return GestureDetector(
+      onTap: () => onItemTapped(index),
+      child: icon != null
+          ? Icon(
+        icon,
+        color: isSelected ? const Color(0xFFA3DD00) : Colors.grey,
+        size: 33,
+      )
+          : Image.asset(
+        imagePath!,
+        height: 28,
+        color: isSelected ? const Color(0xFFA3DD00) : Colors.grey,
       ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, int index, bool isSelected) {
-    return GestureDetector(
-      onTap: () => onItemTapped(index),
-      child: Icon(
-        icon,
-        color: isSelected ? const Color(0xFFA3DD00) : Colors.grey,
-        size: 33,
-      ),
-    );
-  }
 
   Widget _buildProfileItem(int index, bool isSelected) {
     return GestureDetector(
@@ -58,9 +88,9 @@ class CustomBottomNavBar extends StatelessWidget {
       child: CircleAvatar(
         radius: 16,
         backgroundColor: isSelected ? Colors.green.withOpacity(0.2) : Colors.transparent,
-        child: const CircleAvatar(
+        child:  CircleAvatar(
           radius: 14,
-          backgroundImage: NetworkImage("https://i.pravatar.cc/150?img=5"), // Example user avatar
+          backgroundImage: NetworkImage(userProfile?.user.profilePic.url ?? ""),
         ),
       ),
     );

@@ -1,30 +1,22 @@
-import '../model/live_follower_model.dart';
+import 'package:zatch_app/model/live_session_res.dart'; // Ensure this path is correct and contains LiveSessionsResponse, Session, Host
+import 'package:zatch_app/services/api_service.dart';   // Ensure this path is correct
 
 class LiveFollowerController {
-  List<LiveFollowerModel> liveUsers = [
-    LiveFollowerModel(
-      name: "Jemma Ray",
-      image: "https://picsum.photos/300/400?random=1",
-      category: "Fashion",
-      viewers: 4200,
-      rating: 5.0,
-      followers: 32000,
-    ),
-    LiveFollowerModel(
-      name: "Ankitha Lauren",
-      image: "https://picsum.photos/300/400?random=2",
-      category: "Travel",
-      viewers: 3100,
-      rating: 4.8,
-      followers: 28000,
-    ),
-    LiveFollowerModel(
-      name: "David Chen",
-      image: "https://picsum.photos/300/400?random=3",
-      category: "Tech",
-      viewers: 2700,
-      rating: 4.7,
-      followers: 15000,
-    ),
-  ];
+  final ApiService _apiService = ApiService();
+
+  Future<List<Session>> getLiveSessions() async {
+    try {
+      final liveSessionsResponse = await _apiService.getLiveSessions();
+
+      if (liveSessionsResponse.success) {
+        return liveSessionsResponse.sessions;
+      } else {
+        throw Exception('Failed to fetch live sessions: Server indicated not successful.');
+      }
+    } on Exception catch (e) {
+      print('Error fetching live sessions in LiveFollowerController: $e');
+      throw Exception('Could not load live sessions. Please check your connection and try again.');
+    }
+  }
 }
+

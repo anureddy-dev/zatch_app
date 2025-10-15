@@ -1,38 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:zatch_app/model/live_follower_model.dart';
-import 'package:zatch_app/model/product_model.dart';
-import 'package:zatch_app/view/profile/profile_screen.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:zatch_app/services/api_service.dart';
+import '../model/live_session_res.dart';
+import '../model/product_response.dart';
+import '../view/cart_screen.dart';
+import '../view/profile/profile_screen.dart';
 
 
 class LiveStreamController extends ChangeNotifier {
-  final LiveFollowerModel user;
+  final Session? session;
+  LiveStreamController({ this.session});
 
-  LiveStreamController({required this.user});
-
-  bool isSaved = false;
   bool isLiked = false;
+  bool isSaved = false;
 
-  // Example products (replace with API or real list)
-  final List<Product> products = [
-    Product(
-      name: "Modern light clothes",
-      category: "Fashion",
-      price: "₹ 212.99",
-      imageUrl: "https://picsum.photos/200/300",
-      discount: "10%",
-      soldCount: 200,
-    ),
-    Product(
-      name: "Wireless Headphones",
-      category: "Electronics",
-      price: "₹ 999.00",
-      imageUrl: "https://picsum.photos/200/301",
-      discount: "20%",
-      soldCount: 540,
-    ),
-  ];
+  List<Product> products = [];
+  Product? displayedProduct;
+  final ApiService _api = ApiService();
 
-  /// Toggle like
+
+  /// Fetch product list from API
+  Future<void> fetchProducts() async {
+    products = await _api.getProducts();
+    if (products.isNotEmpty) {
+      displayedProduct = products.first;
+    }
+    notifyListeners();
+  }
+
   void toggleLike(BuildContext context) {
     isLiked = !isLiked;
     notifyListeners();
@@ -43,7 +38,6 @@ class LiveStreamController extends ChangeNotifier {
     );
   }
 
-  /// Toggle save
   void toggleSave(BuildContext context) {
     isSaved = !isSaved;
     notifyListeners();
@@ -54,41 +48,40 @@ class LiveStreamController extends ChangeNotifier {
     );
   }
 
-  /// Share
   void share(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Shared!")),
-    );
+    final liveLink = "https://zatch.live/${session?.host?.id ?? ""}";
+    Share.share("Watch ${session?.host?.username ?? ""}'s live stream here: $liveLink");
   }
 
-  /// Cart
   void addToCart(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CartScreen()),
+    );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Added to cart 🛒")),
     );
   }
 
-  /// Buy
-  void buyNow(BuildContext context) {
+  void buyNow(BuildContext context, Product? product) {
+    if (product == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Buy button clicked 🛍️")),
+      const SnackBar(content: Text("Buy clicked 🛍️")),
     );
   }
 
-  /// Zatch
-  void zatchNow(BuildContext context) {
+  void zatchNow(BuildContext context, Product? product) {
+    if (product == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Zatch button clicked ⚡")),
+      const SnackBar(content: Text("Zatch clicked ⚡")),
     );
   }
 
-  /// Navigate to profile
   void openProfile(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProfileScreen(person: {},),
-      ),
+      MaterialPageRoute(builder: (_) => ProfileScreen()),
     );
   }
+
 }

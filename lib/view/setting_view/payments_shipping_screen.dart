@@ -1,13 +1,26 @@
+
 import 'package:flutter/material.dart';
+import 'package:zatch_app/view/cart_screen.dart';
 import 'package:zatch_app/view/coupon_apply_screen.dart';
 import 'package:zatch_app/view/order_place_screen.dart';
 import 'package:zatch_app/view/setting_view/add_new_address_screen.dart';
 import 'package:zatch_app/view/setting_view/payment_method_screen.dart';
 
 class CheckoutOrPaymentsScreen extends StatefulWidget {
-  final bool isCheckout; // true => Checkout, false => Payments & Shipping
+  final bool isCheckout;
+  final List<CartItem>? selectedItems;
+  final double? itemsTotalPrice;
+  final double? shippingFee;
+  final double? subTotalPrice;
 
-  const CheckoutOrPaymentsScreen({super.key, this.isCheckout = true});
+  const CheckoutOrPaymentsScreen({
+    super.key,
+    this.isCheckout = true,
+    this.selectedItems,
+    this.itemsTotalPrice,
+    this.shippingFee,
+    this.subTotalPrice,
+  });
 
   @override
   State<CheckoutOrPaymentsScreen> createState() =>
@@ -37,11 +50,30 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                /// 🛒 Show Cart Items only in Checkout
+                /// 🛒 Show Cart Items only in Checkout (NOW DYNAMIC)
                 if (widget.isCheckout) ...[
-                  _cartItem("Modern light clothes", "Dress modern", 212.99, 3),
+                  // Use a ListView.builder for dynamic items
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: widget.selectedItems?.length ?? 0,
+                    itemBuilder: (context, index) {
+                      // --- FIX IS HERE ---
+                      final item = widget.selectedItems?[index];
+                      if (item == null) {
+                        // Return an empty widget if item is null
+                        return const SizedBox.shrink();
+                      }
+                      return _cartItem(item);
+                    },
+                  ),
                   const SizedBox(height: 16),
-                  _shippingInfo(),
+                  _shippingInfo(
+                    itemCount: widget.selectedItems?.length ?? 0,
+                    itemsTotal: widget.itemsTotalPrice ?? 0.0,
+                    shipping: widget.shippingFee ?? 0.0,
+                    subTotal: widget.subTotalPrice ?? 0.0,
+                  ),
                   const SizedBox(height: 16),
 
                   /// 📧 Contact Details
@@ -112,9 +144,8 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder:
-                          (_) =>
-                              PaymentMethodScreen(data: PaymentData.getDummy()),
+                      builder: (_) =>
+                          PaymentMethodScreen(data: PaymentData.getDummy()),
                     ),
                   );
                 }),
@@ -130,11 +161,8 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
                   _couponCodeButton(() {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) =>CouponApplyScreen()
-                      ),
+                      MaterialPageRoute(builder: (_) => CouponApplyScreen()),
                     );
-
                     debugPrint("Coupon Apply tapped");
                   }),
                 ],
@@ -147,10 +175,10 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
             padding: const EdgeInsets.all(16),
             child: ElevatedButton(
               onPressed: () {
-                Navigator.push(
+                Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const OrderPlacedScreen(),
+                    builder: (_) =>  OrderPlacedScreen(),
                   ),
                 );
               },
@@ -203,68 +231,76 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
     );
   }
 
-  Widget _cartItem(String name, String desc, double price, int qty) {
+  // Updated to take a CartItem object
+  Widget _cartItem(CartItem item) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 1,
       child: ListTile(
-        leading: Image.network(
-          "https://picsum.photos/60",
-          width: 50,
-          height: 50,
-          fit: BoxFit.cover,
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            "https://picsum.photos/seed/${item.name}/60", // Use item name as seed for unique image
+            width: 50,
+            height: 50,
+            fit: BoxFit.cover,
+          ),
         ),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(desc),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.remove_circle_outline),
-            ),
-            Text("$qty"),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.add_circle_outline),
-            ),
-          ],
+        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(item.description),
+        trailing: Text(
+          'Qty: ${item.quantity}',
+          style: const TextStyle(fontWeight: FontWeight.w500),
         ),
       ),
     );
   }
 
-  Widget _shippingInfo() {
+  // Updated to take dynamic data
+  Widget _shippingInfo({
+    required int itemCount,
+    required double itemsTotal,
+    required double shipping,
+    required double subTotal,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        Text(
+      children: [
+        const Text(
           "Shipping Information",
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Total (3 items)"),
-            Text("1,014.95 ₹", style: TextStyle(fontWeight: FontWeight.bold)),
+            Text("Total ($itemCount items)"),
+            Text(
+              "${itemsTotal.toStringAsFixed(2)} ₹",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [Text("Shipping Fee"), Text("0.00 ₹")],
+          children: [
+            const Text("Shipping Fee"),
+            Text("${shipping.toStringAsFixed(2)} ₹")
+          ],
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [Text("Discount"), Text("0.00 ₹")],
+          children: const [Text("Discount"), Text("0.00 ₹")],
         ),
-        Divider(),
+        const Divider(),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Sub Total", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text("Sub Total", style: TextStyle(fontWeight: FontWeight.bold)),
             Text(
-              "1,014.95 ₹",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              "${subTotal.toStringAsFixed(2)} ₹",
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ],
         ),

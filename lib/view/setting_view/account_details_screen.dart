@@ -1,8 +1,11 @@
 import 'package:country_code_picker/country_code_picker.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
-import 'package:zatch_app/view/setting_view/change_password_screen.dart';
-import 'change_Info_screen.dart';
+import 'package:zatch_app/services/api_service.dart';
+import 'package:zatch_app/view/auth_view/login.dart';
+import 'change_info_screen.dart';
+import 'change_password_screen.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   final UserProfileResponse? userProfile;
@@ -15,9 +18,8 @@ class AccountDetailsScreen extends StatefulWidget {
 }
 
 class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
+  final ApiService _apiService = ApiService();
   final _formKey = GlobalKey<FormState>();
-  bool _isFormValid = false;
-
 
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
@@ -36,36 +38,59 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   ];
   late List<String> _years;
 
+  bool _isLoading = false;
+  bool _isFormValid = false;
+
+  late UserProfileResponse _currentProfile;
+
   @override
   void initState() {
     super.initState();
-    final user = widget.userProfile?.user;
+    _currentProfile = widget.userProfile!;
 
-    _nameController = TextEditingController(text: user?.username ?? "");
-    _phoneController = TextEditingController(text: user?.phone ?? "");
-    _emailController = TextEditingController(text: user?.email ?? "");
+    final user = _currentProfile.user;
 
-    _nameController.addListener(_validateForm);
-    _phoneController.addListener(_validateForm);
-    _emailController.addListener(_validateForm);
+    _nameController = TextEditingController(text: user.username);
+    _phoneController = TextEditingController(text: user.phone);
+    _emailController = TextEditingController(text: user.email);
+    gender = user.gender;
+    _selectedCountryCode = user.countryCode ?? "+91";
 
-    _selectedCountryCode = user?.countryCode ?? "+91";
+    // DOB parsing
+    if (user.dob!.isNotEmpty) {
+      final parts = user.dob?.split("-");
+      if (parts?.length == 3) {
+        _selectedYear = parts?[0];
+        final monthIndex = int.tryParse(parts![1]);
+        if (monthIndex != null && monthIndex > 0 && monthIndex <= 12) {
+          _selectedMonth = _months[monthIndex - 1];
+        }
+        _selectedDay = parts[2].padLeft(2, '0');
+      }
+    }
 
     _days = List.generate(31, (i) => (i + 1).toString().padLeft(2, '0'));
     int currentYear = DateTime.now().year;
     _years = List.generate(100, (i) => (currentYear - i).toString());
 
-    _validateForm(); // initial check
-  }
-  void _validateForm() {
-    setState(() {
-      _isFormValid =
-          _nameController.text.trim().isNotEmpty &&
-              _phoneController.text.trim().isNotEmpty &&
-              _emailController.text.trim().isNotEmpty;
-    });
+    _nameController.addListener(_validateForm);
+    _phoneController.addListener(_validateForm);
+    _emailController.addListener(_validateForm);
+
+    _validateForm();
   }
 
+  void _validateForm() {
+    setState(() {
+      _isFormValid = _nameController.text.isNotEmpty &&
+          _phoneController.text.isNotEmpty &&
+          _emailController.text.isNotEmpty &&
+          _selectedDay != null &&
+          _selectedMonth != null &&
+          _selectedYear != null &&
+          gender.isNotEmpty;
+    });
+  }
 
   @override
   void dispose() {
@@ -84,77 +109,84 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _appBar("Account Details"),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _profileHeader(),
-                        const SizedBox(height: 16),
-                        Divider(height: 1,color: Colors.grey),
-                        const SizedBox(height: 24),
-                        _buildTextField("Name", _nameController),
-                        const SizedBox(height: 16),
-                        _buildLabel("Gender"),
-                        const SizedBox(height: 8),
-                        _genderSelector(),
-                        const SizedBox(height: 16),
-                        _buildLabel("Date of Birth"),
-                        const SizedBox(height: 8),
-                        _dateOfBirthFields(),
-                        const SizedBox(height: 16),
-                        _phoneField(inputHeight, inputFontSize),
-                        const SizedBox(height: 16),
-                        _buildTextField("Email", _emailController),
-                        const SizedBox(height: 16),
-                        _passwordField(),
-                        const SizedBox(height: 30),
-                        _actionButtons(),
-                      ],
+            Column(
+              children: [
+                _appBar("Account Details"),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _profileHeader(),
+                            const SizedBox(height: 16),
+                            Divider(height: 1,color: Colors.grey),
+                            const SizedBox(height: 24),
+                            _buildTextField("Name", _nameController),
+                            const SizedBox(height: 16),
+                            _buildLabel("Gender"),
+                            const SizedBox(height: 8),
+                            _genderSelector(),
+                            const SizedBox(height: 16),
+                            _buildLabel("Date of Birth"),
+                            const SizedBox(height: 8),
+                            _dateOfBirthFields(),
+                            const SizedBox(height: 16),
+                            _phoneField(inputHeight, inputFontSize),
+                            const SizedBox(height: 16),
+                            _buildTextField("Email", _emailController),
+                            const SizedBox(height: 16),
+                            _passwordField(),
+                            const SizedBox(height: 30),
+                            _actionButtons(),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
+            if (_isLoading)
+              Container(
+                color: Colors.black38,
+                child: const Center(child: CircularProgressIndicator()),
+              ),
           ],
         ),
       ),
     );
   }
 
-  PreferredSizeWidget _appBar(String title) {
-    return AppBar(
-      backgroundColor: Colors.grey.shade100,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.black),
-        onPressed: () {
-          if (widget.onBack != null) widget.onBack!();
-          else if (Navigator.canPop(context)) Navigator.pop(context);
-        },
-      ),
-      centerTitle: true,
-      title: Text(title,
-          style: const TextStyle(
-              fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
-    );
-  }
+  // -------------------- UI Helpers --------------------
+  PreferredSizeWidget _appBar(String title) => AppBar(
+    backgroundColor: Colors.grey.shade100,
+    elevation: 0,
+    leading: IconButton(
+      icon: const Icon(Icons.arrow_back, color: Colors.black),
+      onPressed: () {
+        if (widget.onBack != null) widget.onBack!();
+        else if (Navigator.canPop(context)) Navigator.pop(context);
+      },
+    ),
+    centerTitle: true,
+    title: Text(title,
+        style: const TextStyle(
+            fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+  );
 
   Widget _profileHeader() {
-    final profilePicUrl = widget.userProfile?.user.profilePic.url ?? "";
-
+    final profilePicUrl = _currentProfile.user.profilePic.url ?? "";
     return Row(
       children: [
         Stack(
@@ -163,7 +195,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               radius: 40,
               backgroundImage: profilePicUrl.isNotEmpty
                   ? NetworkImage(profilePicUrl)
-                  : const NetworkImage(""),
+                  : null,
+              child: profilePicUrl.isEmpty ? const Icon(Icons.person) : null,
             ),
             Positioned(
               bottom: 0,
@@ -195,69 +228,64 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Text(text,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14));
-  }
+  Widget _buildLabel(String text) => Text(text,
+      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14));
 
-  Widget _buildTextField(String label, TextEditingController controller) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildLabel(label),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.grey.shade100,
-            contentPadding:
-            const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+  Widget _buildTextField(String label, TextEditingController controller) =>
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildLabel(label),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey.shade100,
+              contentPadding:
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
             ),
           ),
-        ),
-      ],
-    );
-  }
+        ],
+      );
 
-  Widget _passwordField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildLabel("Password"),
-        const SizedBox(height: 8),
-        TextFormField(
-          initialValue: "********",
-          readOnly: true,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.grey.shade100,
-            contentPadding:
-            const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            suffix: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const ChangePasswordScreen()),
-                );
-              },
-              child: const Text("Change Password",
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: Color(0xFFA3DD00))),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
+  Widget _passwordField() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _buildLabel("Password"),
+      const SizedBox(height: 8),
+      TextFormField(
+        initialValue: "********",
+        readOnly: true,
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: Colors.grey.shade100,
+          contentPadding:
+          const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          suffix: GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => ChangePasswordScreen()),
+              );
+            },
+            child: const Text("Change Password",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: Color(0xFFA3DD00))),
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
 
   Widget _genderSelector() {
     final options = {"Male": Icons.male, "Female": Icons.female, "Other": Icons.transgender};
@@ -266,7 +294,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         final isSelected = gender == entry.key;
         return Expanded(
           child: GestureDetector(
-            onTap: () => setState(() => gender = entry.key),
+            onTap: () => setState(() { gender = entry.key; _validateForm(); }),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -295,11 +323,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   Widget _dateOfBirthFields() {
     return Row(
       children: [
-        _dobDropdown(_days, _selectedDay, "dd", (v) => setState(() => _selectedDay = v)),
+        _dobDropdown(_days, _selectedDay, "dd", (v) => setState(() { _selectedDay = v; _validateForm(); })),
         const SizedBox(width: 8),
-        _dobDropdown(_months, _selectedMonth, "mm", (v) => setState(() => _selectedMonth = v)),
+        _dobDropdown(_months, _selectedMonth, "mm", (v) => setState(() { _selectedMonth = v; _validateForm(); })),
         const SizedBox(width: 8),
-        _dobDropdown(_years, _selectedYear, "yyyy", (v) => setState(() => _selectedYear = v)),
+        _dobDropdown(_years, _selectedYear, "yyyy", (v) => setState(() { _selectedYear = v; _validateForm(); })),
       ],
     );
   }
@@ -340,9 +368,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               ),
               child: CountryCodePicker(
                 onChanged: (countryCode) {
-                  setState(() {
-                    _selectedCountryCode = countryCode.dialCode ?? "+91";
-                  });
+                  setState(() { _selectedCountryCode = countryCode.dialCode ?? "+91"; _validateForm(); });
                 },
                 initialSelection: 'IN',
                 favorite: ['+91', 'IN'],
@@ -362,15 +388,13 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                   color: const Color(0xFFF2F4F5),
                   borderRadius: BorderRadius.circular(50),
                 ),
-                alignment: Alignment.center,
-                child: TextField(
+                child: TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    hintText: 'Mobile Number',
-                    hintStyle: TextStyle(color: Colors.grey, fontSize: inputFontSize),
+                  decoration: const InputDecoration(
                     border: InputBorder.none,
                   ),
+                  style: TextStyle(fontSize: inputFontSize),
                 ),
               ),
             ),
@@ -382,107 +406,204 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
   Widget _actionButtons() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            side: const BorderSide(color: Colors.black26),
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        SizedBox(
+          width: double.infinity,        child: ElevatedButton(
+          onPressed: Navigator.canPop(context) ? () => Navigator.pop(context) : null,
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Colors.black,
+
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30),side: BorderSide(color: Color(0xFFA3DD00))),
+            padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          onPressed: () {
-            if (widget.onBack != null) widget.onBack!();
-            else if (Navigator.canPop(context)) Navigator.pop(context);
-          },
-          child: const Text("Cancel", style: TextStyle(color: Colors.black)),
+          child: const Text("Cancel",style: TextStyle(fontSize: 16),),
+        ),
         ),
         const SizedBox(height: 12),
-        ElevatedButton(
+
+        SizedBox(
+          width: double.infinity,        child: ElevatedButton(
+          onPressed: _isFormValid ? _handleSaveChanges : null,
           style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            backgroundColor: _isFormValid ? const Color(0xFFA3DD00) : Colors.grey,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: const Color(0xFFA3DD00),
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          onPressed: _isFormValid
-              ? () {
-            if (_formKey.currentState?.validate() ?? false) {
-              final user = widget.userProfile?.user;
-
-              final oldPhone = user?.phone ?? "";
-              final oldEmail = user?.email ?? "";
-
-              final newPhone = _phoneController.text.trim();
-              final newEmail = _emailController.text.trim();
-
-              bool phoneChanged = newPhone != oldPhone;
-              bool emailChanged = newEmail != oldEmail;
-
-              if (phoneChanged && emailChanged) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChangeInfoScreen(
-                      title: "Verify Your Details",
-                      subtitle: "OTP verification is required for Email & Phone",
-                      showPhone: true,
-                      showEmail: true,
-                      onVerified: () {
-                        _updateProfile(newPhone, newEmail);
-                      },
-                    ),
-                  ),
-                );
-              } else if (phoneChanged) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChangeInfoScreen(
-                      title: "Verify Phone Number",
-                      subtitle: "OTP verification is required for your Phone",
-                      showPhone: true,
-                      showEmail: false,
-                      onVerified: () {
-                        _updateProfile(newPhone, oldEmail);
-                      },
-                    ),
-                  ),
-                );
-              } else if (emailChanged) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChangeInfoScreen(
-                      title: "Verify Email Address",
-                      subtitle: "OTP verification is required for your Email",
-                      showPhone: false,
-                      showEmail: true,
-                      onVerified: () {
-                        _updateProfile(oldPhone, newEmail);
-                      },
-                    ),
-                  ),
-                );
-              } else {
-                _updateProfile(oldPhone, oldEmail);
-              }
-            }
-          }
-              : null,
-          child: const Text(
-            "Save Changes",
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          ),
+          child: const Text("Save Changes",style: TextStyle(fontSize: 16)),
         ),
-
+        ),
       ],
     );
   }
 
-  // ✅ FIXED: now inside the State class, so context works
-  void _updateProfile(String phone, String email) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Profile updated successfully!")),
-    );
+  // -------------------- Save Logic --------------------
+  void _handleSaveChanges() async {
+    final oldPhone = _currentProfile.user.phone;
+    final oldEmail = _currentProfile.user.email;
+    final oldDob = _currentProfile.user.dob;
+
+    final newPhone = _phoneController.text.trim();
+    final newEmail = _emailController.text.trim();
+    final newDob =
+        "${_selectedYear!}-${(_months.indexOf(_selectedMonth!) + 1).toString().padLeft(2, '0')}-${_selectedDay!}";
+
+    final phoneChanged = newPhone != oldPhone;
+    final emailChanged = newEmail != oldEmail;
+    final dobChanged = newDob != oldDob;
+
+    final otherChanges =
+        _nameController.text.trim() != _currentProfile.user.username ||
+            gender != _currentProfile.user.gender ||
+            dobChanged;
+    if (emailChanged && phoneChanged) {
+      setState(() => _isLoading = true);
+      try {
+        await _apiService.sendEmailOtp(newEmail);
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChangeInfoScreen(
+              title: "OTP Verification",
+              subtitle: "Enter the OTP received on your email",
+              showEmail: true,
+              showPhone: false,
+              onVerified: ({emailOtp, phoneOtp}) {
+                _updateProfileLoader(
+                  otp: emailOtp,
+                  otpType: "email",
+                  dob: newDob,
+                );
+              },
+            ),
+          ),
+        );
+      } on DioException catch (e) {
+        if (e.type == DioExceptionType.receiveTimeout) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("OTP may take a few seconds — please check your inbox."),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error sending Email OTP: ${e.message}")),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Unexpected error: $e")),
+        );
+      }
+
+      return;
+    }
+    if (emailChanged) {
+      setState(() => _isLoading = true);
+      try {
+        await _apiService.sendEmailOtp(newEmail);
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChangeInfoScreen(
+              title: "Email Verification",
+              subtitle: "Enter the OTP received on your email",
+              showEmail: true,
+              showPhone: false,
+              onVerified: ({emailOtp, phoneOtp}) {
+                _updateProfileLoader(
+                  otp: emailOtp,
+                  otpType: "email",
+                  dob: newDob,
+                );
+              },
+            ),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error sending Email OTP: $e")),
+        );
+      } finally {
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
+    if (phoneChanged) {
+      setState(() => _isLoading = true);
+      try {
+        await _apiService.sendPhoneOtp(_selectedCountryCode, newPhone);
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChangeInfoScreen(
+              title: "Mobile Verification",
+              subtitle: "Enter the OTP received on your mobile number",
+              showEmail: false,
+              showPhone: true,
+              onVerified: ({emailOtp, phoneOtp}) {
+                _updateProfileLoader(
+                  otp: phoneOtp,
+                  otpType: "phone",
+                  dob: newDob,
+                );
+              },
+            ),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error sending Phone OTP: $e")),
+        );
+      } finally {
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
+    if (otherChanges) {
+      _updateProfileLoader(dob: newDob);
+    }
+  }
+
+  Future<void> _updateProfileLoader({
+    String? otp,
+    String? phoneOtp,
+    String? otpType,
+    String? dob,
+  }) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await _apiService.updateUserProfile(
+        name: _nameController.text.trim(),
+        gender: gender,
+        dob: dob,
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        countryCode: _selectedCountryCode,
+        otp: otp,
+        otpType: otpType,
+      );
+
+      print("Update Profile Request Sent.");
+      print("Update Profile Response: $response");
+
+      setState(() {
+        _currentProfile = response as UserProfileResponse;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Profile updated successfully!")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error updating profile: $e")),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 }

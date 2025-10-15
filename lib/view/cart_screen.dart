@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/carts_model.dart';
+import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
 import 'zatching_details_screen.dart';
 
 class CartItem {
@@ -9,11 +10,13 @@ class CartItem {
   bool isSelected;
   int quantity;
   String? saleInfo;
+  String imageUrl;
 
   CartItem({
     required this.name,
     required this.description,
     required this.price,
+    required this.imageUrl,
     this.isSelected = true,
     this.quantity = 1,
     this.saleInfo,
@@ -34,26 +37,41 @@ class _CartScreenState extends State<CartScreen>
   // 🛒 Cart items
   List<CartItem> cartItems = [
     CartItem(
-        name: "Modern light clothes",
-        description: "Dress modern",
-        price: 5.1,
-        quantity: 1,
-        isSelected: true),
+      name: "Modern light clothes",
+      description: "Dress modern",
+      price: 5.1,
+      imageUrl: "https://picsum.photos/200/300",
+      quantity: 4,
+      isSelected: true,
+    ),
     CartItem(
-        name: "Another Item",
-        description: "Details here",
-        price: 10.2,
-        quantity: 2,
-        isSelected: true),
+      name: "Modern light clothes",
+      description: "Dress modern",
+      price: 5.1,
+      imageUrl: "https://picsum.photos/201/300",
+      quantity: 4,
+      isSelected: true,
+    ),
     CartItem(
-        name: "Special Sale Item",
-        description: "Limited time",
-        price: 7.5,
-        quantity: 1,
-        isSelected: false,
-        saleInfo: "Sale ends in 30 min"),
+      name: "Modern light clothes",
+      description: "Dress modern",
+      price: 5.1,
+      imageUrl: "https://picsum.photos/202/300",
+      quantity: 4,
+      isSelected: false,
+      saleInfo: "Sale ends in 30 min",
+    ),
+    CartItem(
+      name: "Modern light clothes",
+      description: "Dress modern",
+      price: 5.1,
+      imageUrl: "https://picsum.photos/203/300",
+      quantity: 4,
+      isSelected: false,
+    ),
   ];
 
+  // ⏱ Zatches mock data
   List<Zatch> zatches = [
     Zatch(
       id: "1",
@@ -113,7 +131,6 @@ class _CartScreenState extends State<CartScreen>
       date: "Yesterday 12:00PM",
     ),
   ];
-
   @override
   void initState() {
     super.initState();
@@ -130,8 +147,7 @@ class _CartScreenState extends State<CartScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title:
-        const Text("Cart", style: TextStyle(color: Colors.black)),
+        title: const Text("Cart", style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         centerTitle: true,
         elevation: 0,
@@ -140,8 +156,7 @@ class _CartScreenState extends State<CartScreen>
         children: [
           // 🔹 Tabs
           Container(
-            margin:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.grey.shade100,
               borderRadius: BorderRadius.circular(20),
@@ -157,21 +172,14 @@ class _CartScreenState extends State<CartScreen>
               ),
               labelColor: Colors.black,
               unselectedLabelColor: Colors.grey.shade700,
-              tabs: const [
-                Tab(text: "Cart"),
-                Tab(text: "Zatches"),
-              ],
+              tabs: const [Tab(text: "Cart"), Tab(text: "Zatches")],
             ),
           ),
 
-          // 🔹 Tab views
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [
-                _buildCartTab(),
-                _buildZatchesTab(),
-              ],
+              children: [_buildCartTab(), _buildZatchesTab()],
             ),
           ),
         ],
@@ -179,80 +187,134 @@ class _CartScreenState extends State<CartScreen>
     );
   }
 
-  /// 🛒 CART TAB
+  /// 🛒 CART TAB DESIGN
   Widget _buildCartTab() {
-    int selectedItemsCount =
-        cartItems.where((item) => item.isSelected).length;
+    int selectedItemsCount = cartItems.where((item) => item.isSelected).length;
 
     double itemsTotalPriceValue = cartItems
         .where((i) => i.isSelected)
         .fold(0, (sum, i) => sum + (i.price * i.quantity));
 
     double shippingFeeValue = selectedItemsCount > 0 ? 10.0 : 0.0;
-    double subTotalPriceValue =
-        itemsTotalPriceValue + shippingFeeValue;
+    double subTotalPriceValue = itemsTotalPriceValue + shippingFeeValue;
 
-    String totalItemsPrice =
-        "${itemsTotalPriceValue.toStringAsFixed(2)}₹";
+    String totalItemsPrice = "${itemsTotalPriceValue.toStringAsFixed(2)}₹";
     String shippingFee = "${shippingFeeValue.toStringAsFixed(2)}₹";
-    String subTotalPrice =
-        "${subTotalPriceValue.toStringAsFixed(2)}₹";
+    String subTotalPrice = "${subTotalPriceValue.toStringAsFixed(2)}₹";
 
     return Stack(
       children: [
         ListView.builder(
-          padding: const EdgeInsets.only(bottom: 200),
+          padding: const EdgeInsets.only(bottom: 180),
           itemCount: cartItems.length,
           itemBuilder: (context, index) {
             final item = cartItems[index];
-            return ListTile(
-              leading: Checkbox(
-                value: item.isSelected,
-                activeColor: const Color(0xFFB7DF4B),
-                onChanged: (val) {
-                  setState(() {
-                    item.isSelected = val ?? false;
-                  });
-                },
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.shade300,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.name,
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Checkbox(
+                      value: item.isSelected,
+                      shape: const CircleBorder(),
+                      activeColor: const Color(0xFFB7DF4B),
+                      onChanged: (val) {
+                        setState(() {
+                          item.isSelected = val ?? false;
+                        });
+                      },
+                    ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        item.imageUrl,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ],
+                ),
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold)),
-                  if (item.saleInfo != null)
-                    Text(item.saleInfo!,
-                        style: const TextStyle(
-                            color: Colors.red, fontSize: 12)),
-                  Text(item.description),
-                  const SizedBox(height: 4),
-                  Text("${item.price.toStringAsFixed(1)}₹"),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: () {
-                      setState(() {
-                        if (item.quantity > 1) {
-                          item.quantity--;
-                        }
-                      });
-                    },
-                  ),
-                  Text("${item.quantity}"),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () {
-                      setState(() {
-                        item.quantity++;
-                      });
-                    },
-                  ),
-                ],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (item.saleInfo != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          item.saleInfo!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    Text(
+                      item.description,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "${item.price.toStringAsFixed(1)}₹",
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline),
+                          color: Colors.grey,
+                          iconSize: 20,
+                          onPressed: () {
+                            setState(() {
+                              if (item.quantity > 1) item.quantity--;
+                            });
+                          },
+                        ),
+                        Text(
+                          "${item.quantity}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline),
+                          color: Colors.grey,
+                          iconSize: 20,
+                          onPressed: () {
+                            setState(() {
+                              item.quantity++;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -273,41 +335,40 @@ class _CartScreenState extends State<CartScreen>
               ),
               boxShadow: const [
                 BoxShadow(
-                    blurRadius: 8,
-                    color: Colors.black26,
-                    offset: Offset(0, -2))
+                  blurRadius: 8,
+                  color: Colors.black26,
+                  offset: Offset(0, -2),
+                ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text("Items ($selectedItemsCount Selected)"),
                     Text(totalItemsPrice),
                   ],
                 ),
                 Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text("Shipping Fee"),
-                    Text(shippingFee),
-                  ],
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [const Text("Shipping Fee"), Text(shippingFee)],
                 ),
                 Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("Sub Total",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold)),
-                    Text(subTotalPrice,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16)),
+                    const Text(
+                      "Sub Total",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      subTotalPrice,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -319,15 +380,27 @@ class _CartScreenState extends State<CartScreen>
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: selectedItemsCount > 0
-                      ? () {
-                    debugPrint("Pay tapped: $subTotalPrice");
-                  }
-                      : null,
-                  child: const Text("Pay",
-                      style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold)),
+                  onPressed:
+                      selectedItemsCount > 0
+                          ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (_) => const CheckoutOrPaymentsScreen(
+                                      isCheckout: true,
+                                    ),
+                              ),
+                            );
+                          }
+                          : null,
+                  child: const Text(
+                    "Pay",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -337,22 +410,24 @@ class _CartScreenState extends State<CartScreen>
     );
   }
 
-  /// ⏱ ZATCHES TAB
+  /// 🕒 ZATCHES TAB DESIGN
   Widget _buildZatchesTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text("Active Zatches",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text(
+          "Active Zatches",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
-        for (final zatch in zatches.where((z) => z.active))
-          _zatchItem(zatch),
+        for (final zatch in zatches.where((z) => z.active)) _zatchItem(zatch),
         const SizedBox(height: 20),
-        const Text("Expired",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text(
+          "Expired",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
-        for (final zatch in zatches.where((z) => !z.active))
-          _zatchItem(zatch),
+        for (final zatch in zatches.where((z) => !z.active)) _zatchItem(zatch),
       ],
     );
   }
@@ -372,7 +447,8 @@ class _CartScreenState extends State<CartScreen>
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: zatch.active ? Colors.green.withOpacity(0.05) : Colors.grey[200],
+          color:
+              zatch.active ? Colors.green.withOpacity(0.05) : Colors.grey[200],
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: zatch.active ? Colors.green.shade200 : Colors.grey.shade300,
@@ -398,14 +474,23 @@ class _CartScreenState extends State<CartScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(zatch.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text(zatch.date,
-                          style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                      Text(
+                        zatch.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        zatch.date,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
-                  Text("Sold by: ${zatch.seller}",
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(
+                    "Sold by: ${zatch.seller}",
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     zatch.status,
@@ -418,30 +503,38 @@ class _CartScreenState extends State<CartScreen>
                   Row(
                     children: [
                       Expanded(
-                        child: Text("Quote Price: ${zatch.quotePrice}",
-                            style: const TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis),
+                        child: Text(
+                          "Quote Price: ${zatch.quotePrice}",
+                          style: const TextStyle(fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       if (zatch.sellerPrice.isNotEmpty)
                         Expanded(
-                          child: Text("Seller Price: ${zatch.sellerPrice}",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: zatch.active ? Colors.red : Colors.grey[700],
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            "Seller Price: ${zatch.sellerPrice}",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  zatch.active ? Colors.red : Colors.grey[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                     ],
                   ),
                   if (zatch.expiresIn != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0),
-                      child: Text(zatch.expiresIn!,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.red)),
+                      child: Text(
+                        zatch.expiresIn!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.red,
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -451,5 +544,4 @@ class _CartScreenState extends State<CartScreen>
       ),
     );
   }
-
 }

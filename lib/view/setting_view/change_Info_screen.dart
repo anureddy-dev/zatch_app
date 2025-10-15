@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 class ChangeInfoScreen extends StatefulWidget {
   final String title;
-  final String subtitle; // 🔥 added subtitle
+  final String subtitle;
   final bool showEmail;
   final bool showPhone;
-  final VoidCallback onVerified;
+  final void Function({String? emailOtp, String? phoneOtp}) onVerified;
 
   const ChangeInfoScreen({
     super.key,
@@ -13,25 +13,21 @@ class ChangeInfoScreen extends StatefulWidget {
     this.subtitle = "",
     this.showEmail = false,
     this.showPhone = false,
-    required this.onVerified
+    required this.onVerified,
   });
 
   @override
-  State<ChangeInfoScreen> createState() => _OtpVerificationScreenState();
+  State<ChangeInfoScreen> createState() => _ChangeInfoScreenState();
 }
 
-class _OtpVerificationScreenState extends State<ChangeInfoScreen> {
-  final _otpControllers = List.generate(4, (_) => TextEditingController());
+class _ChangeInfoScreenState extends State<ChangeInfoScreen> {
+  final _phoneOtpControllers = List.generate(4, (_) => TextEditingController());
   final _emailOtpControllers = List.generate(4, (_) => TextEditingController());
 
   @override
   void dispose() {
-    for (var c in _otpControllers) {
-      c.dispose();
-    }
-    for (var c in _emailOtpControllers) {
-      c.dispose();
-    }
+    for (var c in _phoneOtpControllers) c.dispose();
+    for (var c in _emailOtpControllers) c.dispose();
     super.dispose();
   }
 
@@ -56,9 +52,7 @@ class _OtpVerificationScreenState extends State<ChangeInfoScreen> {
           ),
         ),
         onChanged: (val) {
-          if (val.isNotEmpty) {
-            FocusScope.of(context).nextFocus();
-          }
+          if (val.isNotEmpty) FocusScope.of(context).nextFocus();
         },
       ),
     );
@@ -91,21 +85,13 @@ class _OtpVerificationScreenState extends State<ChangeInfoScreen> {
         ),
         centerTitle: true,
         title: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              widget.title,
-              style: const TextStyle(
-                  color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
-            ),
+            Text(widget.title,
+                style:
+                const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
             if (widget.subtitle.isNotEmpty)
-              Text(
-                widget.subtitle,
-                style: const TextStyle(
-                  color: Colors.black54,
-                  fontSize: 13,
-                ),
-              ),
+              Text(widget.subtitle,
+                  style: const TextStyle(color: Colors.black54, fontSize: 13)),
           ],
         ),
       ),
@@ -121,14 +107,10 @@ class _OtpVerificationScreenState extends State<ChangeInfoScreen> {
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   if (widget.showPhone) ...[
-                    const Text(
-                      "Mobile Verification",
-                      style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
+                    const Text("Mobile Verification",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     const Text(
                       "Enter the 4-digit OTP received on your mobile number",
@@ -136,30 +118,12 @@ class _OtpVerificationScreenState extends State<ChangeInfoScreen> {
                       style: TextStyle(color: Colors.black54),
                     ),
                     const SizedBox(height: 20),
-                    _otpRow(_otpControllers),
-                    const SizedBox(height: 12),
-                    const Text.rich(
-                      TextSpan(
-                        text: "Didn't receive OTP ? ",
-                        children: [
-                          TextSpan(
-                            text: "Resend in 30 sec",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black),
-                          ),
-                        ],
-                      ),
-                      style: TextStyle(color: Colors.black54),
-                    ),
+                    _otpRow(_phoneOtpControllers),
                     const SizedBox(height: 24),
                   ],
                   if (widget.showEmail) ...[
-                    const Text(
-                      "Email Verification",
-                      style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
+                    const Text("Email Verification",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     const Text(
                       "Enter the 4-digit OTP received on your Email",
@@ -168,21 +132,6 @@ class _OtpVerificationScreenState extends State<ChangeInfoScreen> {
                     ),
                     const SizedBox(height: 20),
                     _otpRow(_emailOtpControllers),
-                    const SizedBox(height: 12),
-                    const Text.rich(
-                      TextSpan(
-                        text: "Didn't receive OTP ? ",
-                        children: [
-                          TextSpan(
-                            text: "Resend in 30 sec",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black),
-                          ),
-                        ],
-                      ),
-                      style: TextStyle(color: Colors.black54),
-                    ),
                     const SizedBox(height: 24),
                   ],
                   Row(
@@ -192,12 +141,10 @@ class _OtpVerificationScreenState extends State<ChangeInfoScreen> {
                           onPressed: () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: brandGreen, width: 1.5),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          child: const Text("Cancel",
-                              style: TextStyle(color: Colors.black)),
+                          child: const Text("Cancel", style: TextStyle(color: Colors.black)),
                         ),
                       ),
                     ],
@@ -207,18 +154,20 @@ class _OtpVerificationScreenState extends State<ChangeInfoScreen> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text("OTP Verified Successfully")),
-                        );
-                        widget.onVerified();
+                        final phoneOtp = widget.showPhone
+                            ? _phoneOtpControllers.map((c) => c.text).join()
+                            : null;
+                        final emailOtp = widget.showEmail
+                            ? _emailOtpControllers.map((c) => c.text).join()
+                            : null;
+
+                        widget.onVerified(emailOtp: emailOtp, phoneOtp: phoneOtp);
                         Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: brandGreen,
                         foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: const Text("Save Changes"),

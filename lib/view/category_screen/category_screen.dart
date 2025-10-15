@@ -7,11 +7,11 @@ import 'package:zatch_app/view/category_screen/simple_base_screen.dart';
 import 'package:zatch_app/view/home_page.dart';
 
 class CategoryScreen extends StatefulWidget {
-  final LoginResponse loginResponse;
+  final LoginResponse? loginResponse;
 
   const CategoryScreen({
     super.key,
-    required this.loginResponse,
+    this.loginResponse,
   });
 
   @override

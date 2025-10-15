@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:zatch_app/view/auth_view/welcome.dart';
+import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/auth_view/login.dart';
+import 'package:zatch_app/view/auth_view/register_screen.dart';
+import 'package:zatch_app/view/auth_view/welcome.dart';
 import 'package:zatch_app/view/help_screen.dart';
-import 'package:zatch_app/view/search_view/search_screen.dart';
-import 'package:zatch_app/view/product_view/product_detail_screen.dart';
+import 'package:zatch_app/view/splash_route_decider.dart';
 
 import 'Widget/explore_page.dart';
 import 'Widget/notification_screen.dart';
-import 'view/auth_view/register_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ApiService().init();
   runApp(const MyApp());
 }
 
@@ -19,33 +21,24 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: ApiService.navigatorKey, // <- important!
       debugShowCheckedModeBanner: false,
       title: 'Zatch',
       theme: ThemeData(
         fontFamily: 'Plus Jakarta Sans',
-        colorScheme: const ColorScheme(
-          brightness: Brightness.light,
+        colorScheme: const ColorScheme.light(
           primary: Color(0xFFCCF656),
-          onPrimary: Colors.black,
-          secondary: Colors.white,
-          onSecondary: Colors.black,
-          error: Colors.redAccent,
-          onError: Colors.white,
-          background: Colors.white,
-          onBackground: Colors.black,
-          surface: Colors.white,
-          onSurface: Colors.black,
         ),
         useMaterial3: true,
       ),
-      initialRoute: '/welcome',
+      home: const SplashRouteDecider(),
       routes: {
-        '/welcome': (context) => const WelcomeScreen(),
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
-        '/explore': (context) => const ExplorePage(),
-        '/notification': (context) => const NotificationPage(),
-        '/help': (context) => const HelpScreen(),
+        '/welcome': (_) => const WelcomeScreen(),
+        '/login': (_) => const LoginScreen(),
+        '/register': (_) => const RegisterScreen(),
+        '/explore': (_) => const ExplorePage(),
+        '/notification': (_) => const NotificationPage(),
+        '/help': (_) => const HelpScreen(),
       },
     );
   }

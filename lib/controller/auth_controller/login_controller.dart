@@ -10,8 +10,9 @@ class LoginController {
   Future<LoginResponse> loginUser({
     required String phone,
     required String password,
+    required String countryCode,
   }) async {
-    final request = LoginRequest(phone: phone, password: password);
+    final request = LoginRequest(phone: phone, password: password,countryCode: countryCode);
     return await _apiService.loginUser(request);
   }
 

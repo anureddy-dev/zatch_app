@@ -1,7 +1,8 @@
+import 'package:another_flushbar/flushbar.dart'; // <-- Import Flushbar
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zatch_app/controller/auth_controller/login_controller.dart';
-import 'package:zatch_app/model/categories_response.dart';
 import 'package:zatch_app/view/category_screen/category_screen.dart';
 import 'package:zatch_app/view/home_page.dart';
 import '../../utils/auth_utils/base_screen.dart';
@@ -24,107 +25,115 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final LoginController _loginController = LoginController();
 
-  /*Future<void> _handleLogin() async {
-    setState(() => _isLoading = true);
-    try {
-      final res = await _loginController.loginUser(
-        phone: _phoneController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+  // --- MODIFIED: Replaced SnackBar with Flushbar for showing messages ---
+  void _showMessage(String title, String message, {bool isError = true}) {
+    if (!mounted) return;
+    Flushbar(
+      title: title,
+      message: message,
+      duration: const Duration(seconds: 3),
+      backgroundColor: isError ? Colors.red : Colors.green,
+      margin: const EdgeInsets.all(8),
+      borderRadius: BorderRadius.circular(8),
+      icon: Icon(
+        isError ? Icons.error_outline : Icons.check_circle_outline,
+        size: 28.0,
+        color: Colors.white,
+      ),
+      flushbarPosition: FlushbarPosition.TOP,
+    ).show(context);
+  }
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res.message)),
-      );
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => CategoryScreen(loginResponse: res,),
-        ),
-      );
-
-      *//*Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => HomePage(loginResponse: res),
-        ),
-      );*//*
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }*/
-
+  // --- MODIFIED: Implemented detailed validation ---
   Future<void> _handleLogin() async {
+    final phone = _phoneController.text.trim();
+    final password = _passwordController.text.trim();
+
+    // --- Granular Validation ---
+    if (phone.isEmpty) {
+      _showMessage("Validation Error", "Please enter your mobile number.");
+      return;
+    }
+    if (phone.length != 10) {
+      _showMessage("Validation Error", "Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    if (password.isEmpty) {
+      _showMessage("Validation Error", "Please enter your password.");
+      return;
+    }
+
     setState(() => _isLoading = true);
+
+    final countryCode = _selectedCountryCode;
+    print("Login request -> phone: $phone, password: $password, countryCode: $countryCode");
+
     try {
       final res = await _loginController.loginUser(
-        phone: _phoneController.text.trim(),
-        password: _passwordController.text.trim(),
+        phone: phone,
+        password: password,
+        countryCode: countryCode,
       );
 
+      print("Login response: $res");
       if (!mounted) return;
+
       final prefs = await SharedPreferences.getInstance();
+      if (res.token.isNotEmpty) {
+        await prefs.setString("authToken", res.token);
+        print("Token saved in SharedPreferences: ${res.token}");
+      }
+
       final selectedCategories = prefs.getStringList("userCategories") ?? [];
+      print("Selected categories: $selectedCategories");
 
       if (selectedCategories.isEmpty) {
+        print("Navigating to CategoryScreen");
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => CategoryScreen(loginResponse: res),
-          ),
+          MaterialPageRoute(builder: (_) => CategoryScreen(loginResponse: res)),
         );
       } else {
+        print("Navigating to HomePage");
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => HomePage(
-              loginResponse: res,
-            ),
-          ),
+          MaterialPageRoute(builder: (_) => HomePage(loginResponse: res)),
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
+      print("Login error: $e");
+      // Use the new message function for API or other errors
+      _showMessage("Login Failed", e.toString(), isError: true);
     } finally {
+      print("Login process finished");
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-
   Future<void> _handleOtpLogin() async {
     setState(() => _isLoading = true);
+    print("OTP login started");
+
     try {
       await Future.delayed(const Duration(seconds: 1));
-
       if (!mounted) return;
+
       final phone = _loginController.getRegisteredPhone() ?? "9019058876";
       final countryCode = _loginController.getRegisteredCountryCode() ?? "+91";
+
+      print("OTP request -> phone: $phone, countryCode: $countryCode");
+
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => OtpScreen(
-            phoneNumber: /*phone*/ "9019058876",
-            countryCode: countryCode,
-          ),
+          builder: (context) => OtpScreen(phoneNumber: phone, countryCode: countryCode),
         ),
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("OTP failed: $e")),
-        );
-      }
+      print("OTP login error: $e");
+      _showMessage("OTP Failed", e.toString(), isError: true);
     } finally {
+      print("OTP login process finished");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -161,23 +170,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(50),
                   ),
                   child: CountryCodePicker(
-                    onChanged: (countryCode) {
-                      _selectedCountryCode = countryCode.dialCode ?? "+91";
-                    },
                     initialSelection: 'IN',
-                    favorite: ['+91', 'IN'],
+                    favorite: const ['+91', 'IN'],
+                    countryFilter: const ['IN'],
+                    showDropDownButton: false,
+                    onChanged: null, // Disabled
                     textStyle: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
+                      color: Colors.black54,
                       fontSize: inputFontSize,
                     ),
                     showFlag: false,
-                    showDropDownButton: true,
                     padding: EdgeInsets.zero,
-                    dialogTextStyle: TextStyle(fontSize: inputFontSize),
                   ),
                 ),
                 const SizedBox(width: 10),
-
                 Expanded(
                   child: Container(
                     height: inputHeight,
@@ -186,14 +192,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: const Color(0xFFF2F4F5),
                       borderRadius: BorderRadius.circular(50),
                     ),
-                    alignment: Alignment.center,
+                    // --- FIX: Align text to the left ---
+                    alignment: Alignment.centerLeft,
                     child: TextField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
+                      style: const TextStyle(color: Colors.black),
                       decoration: InputDecoration(
                         hintText: 'Mobile Number',
                         hintStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary,
+                          color: Colors.black54,
                           fontSize: inputFontSize,
                         ),
                         border: InputBorder.none,
@@ -203,7 +215,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ],
             ),
-
             SizedBox(height: spacingSmall),
 
             /// Password
@@ -214,23 +225,23 @@ class _LoginScreenState extends State<LoginScreen> {
                 color: const Color(0xFFF2F4F5),
                 borderRadius: BorderRadius.circular(50),
               ),
-              alignment: Alignment.center,
+              // --- FIX: Align text to the left ---
+              alignment: Alignment.centerLeft,
               child: TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
+                style: const TextStyle(color: Colors.black),
                 decoration: InputDecoration(
                   hintText: 'Password',
                   hintStyle: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimary,
+                    color: Colors.black54,
                     fontSize: inputFontSize,
                   ),
                   border: InputBorder.none,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: Theme.of(context).colorScheme.onPrimary,
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      color: Colors.black54,
                     ),
                     onPressed: () {
                       setState(() {
@@ -268,50 +279,49 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-
             SizedBox(height: spacingSmall),
-            GestureDetector(onTap: (){
-              Navigator.pushNamed(context, '/register');
-            },
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
-                child: Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'Don’t have an account? ',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: inputFontSize,
-                          fontWeight: FontWeight.w400,
-                          height: 1.64,
-                        ),
+            GestureDetector(
+              onTap: () {
+                Navigator.pushNamed(context, '/register');
+              },
+              child: const Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Dont have account? ',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 14,
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w400,
+                        height: 1.64,
                       ),
-                      TextSpan(
-                        text: 'Create Account',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: inputFontSize,
-                          fontWeight: FontWeight.w700,
-                          decoration: TextDecoration.underline,
-                          height: 1.64,
-                        ),
+                    ),
+                    TextSpan(
+                      text: 'Create Account',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 14,
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                        height: 1.64,
                       ),
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
+                textAlign: TextAlign.center,
               ),
             ),
-
             SizedBox(height: spacingSmall),
-
             Padding(
               padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Expanded(child: Divider(thickness: 1, color: Colors.black26)),
+                  const Expanded(
+                    child: Divider(thickness: 1, color: Colors.black26),
+                  ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Text(
@@ -323,41 +333,36 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const Expanded(child: Divider(thickness: 1, color: Colors.black26)),
+                  const Expanded(
+                    child: Divider(thickness: 1, color: Colors.black26),
+                  ),
                 ],
               ),
             ),
             SizedBox(height: spacingSmall),
 
-            /// Sign in with OTP
+            /// OTP login
             GestureDetector(
               onTap: _handleOtpLogin,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 100),
+              child: Container(
                 width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: paddingVertical),
-                decoration: ShapeDecoration(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(50),
-                    side: const BorderSide(color: Colors.green),
-                  ),
+                height: inputHeight,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.green),
+                  borderRadius: BorderRadius.circular(50),
                 ),
-                child: Center(
-                  child: Text(
-                    'Sign in with OTP',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: inputFontSize + 2,
-                      fontWeight: FontWeight.w600,
-                    ),
+                child: Text(
+                  'Sign in with OTP',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: inputFontSize + 2,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
-
-            SizedBox(height: spacingLarge),
           ],
-
           bottomText: Text.rich(
             TextSpan(
               children: [
@@ -369,11 +374,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     fontWeight: FontWeight.w400,
                   ),
                 ),
-                TextSpan(
+                const TextSpan(
                   text: 'Terms & Conditions',
                   style: TextStyle(
                     color: Colors.black,
-                    fontSize: inputFontSize,
+                    fontSize: 14, // Made consistent
                     fontWeight: FontWeight.w700,
                     decoration: TextDecoration.underline,
                   ),
@@ -384,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
 
-        /// ✅ Full screen loader overlay
+        /// Full screen loader overlay
         if (_isLoading)
           Container(
             color: Colors.black.withOpacity(0.5),

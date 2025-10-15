@@ -1,24 +1,71 @@
+/*
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import 'package:zatch_app/model/product_model.dart';
+import 'package:zatch_app/model/product_response.dart';
+import 'package:zatch_app/services/api_service.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  const ProductDetailScreen({super.key});
+  final String productId;
+
+  const ProductDetailScreen({super.key, required this.productId});
 
   @override
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
 }
 
-class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTickerProviderStateMixin {
-  final _pageController = PageController();
-  late final TabController _tabController;
-  int _selectedSizeIndex = 1;
+class _ProductDetailScreenState extends State<ProductDetailScreen>
+    with SingleTickerProviderStateMixin {
+  final ApiService _apiService = ApiService();
+
+  Product? product;
+  List<Product> topPicks = [];
+  bool loading = true;
+  bool topPicksLoading = true;
+
+  final PageController _pageController = PageController();
+  late TabController _tabController;
+  int _selectedSizeIndex = 0;
   int _selectedColorIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _fetchProductDetails();
+    _fetchTopPicks();
+  }
+
+  Future<void> _fetchProductDetails() async {
+    try {
+      final fetchedProduct = await _apiService.getProductById(widget.productId);
+      if (mounted) {
+        setState(() {
+          product = fetchedProduct;
+          loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to load product: $e")),
+        );
+      }
+    }
+  }
+
+  Future<void> _fetchTopPicks() async {
+    try {
+      final fetchedTopPicks = await _apiService.getTopPicks();
+      if (mounted) {
+        setState(() {
+          topPicks = fetchedTopPicks;
+          topPicksLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => topPicksLoading = false);
+    }
   }
 
   @override
@@ -28,30 +75,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     super.dispose();
   }
 
-  final List<String> productImages = [
-    'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=500&q=80',
-    'https://images.unsplash.com/photo-1617137968427-85924c800a22?w=500&q=80',
-    'https://images.unsplash.com/photo-1588117260148-b4782679c674?w=500&q=80',
-  ];
-
-  final List<Product> similarProducts = [
-    Product(name: "Men's Harrington Jacket", category: 'Jackets', price: '\$148.00', imageUrl: 'https://images.unsplash.com/photo-1591047139829-d916b67ea74f?w=500&q=80', discount: '50%', soldCount: 1200),
-    Product(name: "Hype Cotton terry Slides", category: 'Footwear', price: '\$148.00', imageUrl: 'https://images.unsplash.com/photo-1603487742131-412903b6e82b?w=500&q=80', discount: '50%', soldCount: 1200),
-    Product(name: "Men's Harrington Jacket", category: 'Jackets', price: '\$148.00', imageUrl: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=500&q=80', discount: '50%', soldCount: 1200),
-  ];
-
-  final List<Review> reviews = [
-    Review(userName: 'Veronika', userAvatarUrl: 'https://randomuser.me/api/portraits/women/44.jpg', rating: 5, comment: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod...'),
-    Review(userName: 'Esther', userAvatarUrl: 'https://randomuser.me/api/portraits/women/65.jpg', rating: 4, comment: 'I love this so much! Stay long.'),
-    Review(userName: 'Eren Yeager', userAvatarUrl: 'https://randomuser.me/api/portraits/men/33.jpg', rating: 5, comment: 'This is very refreshing 😄'),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    if (loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final images = product!.images.isNotEmpty
+        ? product!.images.map((e) => e.url).toList()
+        : ['https://via.placeholder.com/150'];
+    final sizes = product!.size != null ? [product!.size!] : ['S', 'M', 'L', 'XL'];
+    final colors = product!.color != null ? [Colors.blue] : [Colors.black, Colors.grey, Colors.blue];
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          _buildSliverAppBar(),
+          _buildSliverAppBar(images),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -63,19 +102,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   const SizedBox(height: 8),
                   _buildDescription(),
                   const SizedBox(height: 24),
-                  _buildSizeSelector(),
+                  _buildSizeSelector(sizes),
                   const SizedBox(height: 24),
-                  _buildColorSelector(),
+                  _buildColorSelector(colors),
                   const SizedBox(height: 24),
                   _buildInfoTabs(),
                   const SizedBox(height: 24),
-                  _buildProductSection("Similar Products", similarProducts),
-                  const SizedBox(height: 24),
-                  _buildPolicySection(),
-                  const SizedBox(height: 24),
-                  _buildProductSection("Products from This Seller", similarProducts.reversed.toList()),
-                  const SizedBox(height: 24),
-                  _buildProductSection("Bargain Picks For You", similarProducts),
+                  if (!topPicksLoading)
+                    _buildProductSection("Top Picks", topPicks),
                   const SizedBox(height: 100), // Space for bottom bar
                 ],
               ),
@@ -87,20 +121,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     );
   }
 
-  Widget _buildSliverAppBar() {
+  Widget _buildSliverAppBar(List<String> images) {
     return SliverAppBar(
       expandedHeight: 400.0,
       pinned: true,
       elevation: 0,
       backgroundColor: Colors.white,
       leading: const Icon(Icons.arrow_back_ios, color: Colors.black),
-      actions: const [
-        Icon(Icons.share_outlined, color: Colors.black),
-        SizedBox(width: 16),
-        Icon(Icons.favorite_border, color: Colors.black),
-        SizedBox(width: 16),
-        Icon(Icons.shopping_bag_outlined, color: Colors.black),
-        SizedBox(width: 16),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.share_outlined, color: Colors.black),
+          onPressed: () {},
+        ),
+        IconButton(
+          icon: const Icon(Icons.favorite_border, color: Colors.black),
+          onPressed: () => _likeProduct(),
+        ),
+        IconButton(
+          icon: const Icon(Icons.shopping_bag_outlined, color: Colors.black),
+          onPressed: () {},
+        ),
+        const SizedBox(width: 16),
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
@@ -108,10 +149,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           children: [
             PageView.builder(
               controller: _pageController,
-              itemCount: productImages.length,
+              itemCount: images.length,
               itemBuilder: (context, index) {
                 return Image.network(
-                  productImages[index],
+                  images[index],
                   fit: BoxFit.cover,
                   width: double.infinity,
                 );
@@ -121,7 +162,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               padding: const EdgeInsets.only(bottom: 16.0),
               child: SmoothPageIndicator(
                 controller: _pageController,
-                count: productImages.length,
+                count: images.length,
                 effect: const WormEffect(
                   dotHeight: 8,
                   dotWidth: 8,
@@ -139,14 +180,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   Widget _buildTitleAndPrice() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: const [
+      children: [
         Text(
-          'Light Dress Bless',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          product!.name,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         Text(
-          '20.99 \$',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+          '${product!.price} ₹',
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blueAccent),
         ),
       ],
     );
@@ -154,13 +195,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   Widget _buildDescription() {
     return Text(
-      'Its simple and elegant shape makes it perfect for those of you who like feminine and minimalist styles.',
+      product!.description ?? '',
       style: TextStyle(fontSize: 14, color: Colors.grey[600], height: 1.5),
     );
   }
 
-  Widget _buildSizeSelector() {
-    final List<String> sizes = ['S', 'M', 'L', 'XL'];
+  Widget _buildSizeSelector(List<String> sizes) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -196,8 +236,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     );
   }
 
-  Widget _buildColorSelector() {
-    final List<Color> colors = [Colors.black, Colors.grey.shade400, Colors.blue.shade900];
+  Widget _buildColorSelector(List<Color> colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -240,19 +279,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           indicatorColor: Colors.black,
           tabs: const [
             Tab(text: 'Basic Info'),
-            Tab(text: 'Community(15)'),
+            Tab(text: 'Community'),
             Tab(text: 'Reviews'),
           ],
         ),
         SizedBox(
-          // Using a fixed height for simplicity, can be made dynamic
           height: 250,
           child: TabBarView(
             controller: _tabController,
             children: [
               _buildBasicInfoTab(),
-              _buildCommunityTab(),
-              _buildReviewsTab(),
+              const Center(child: Text("Community Info Goes Here")),
+              const Center(child: Text("Reviews will be displayed here")),
             ],
           ),
         ),
@@ -262,65 +300,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   Widget _buildBasicInfoTab() {
     return SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text("Info", style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text("We work with monitoring programmes to ensure compliance with safety, health and quality standards for our products."),
-            SizedBox(height: 16),
-            Text("Measurements", style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text("To keep your jackets and coats clean, you only need to freshen them up and go over them with a cloth or a clothes brush. If you need to dry clean a garment, look for a dry cleaner that uses technology that is respectful of the environment."),
-
-          ],
-        )
-    );
-  }
-
-  Widget _buildCommunityTab() {
-    return const Center(child: Text("Community Info Goes Here"));
-  }
-
-  Widget _buildReviewsTab() {
-    return ListView.builder(
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: reviews.length,
-      itemBuilder: (context, index) {
-        final review = reviews[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                backgroundImage: NetworkImage(review.userAvatarUrl),
-                radius: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: List.generate(5, (starIndex) => Icon(
-                        starIndex < review.rating ? Icons.star : Icons.star_border,
-                        color: Colors.amber,
-                        size: 16,
-                      )),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(review.comment, style: TextStyle(color: Colors.grey[700])),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Text(product!.info1 ?? ''),
     );
   }
 
@@ -341,9 +322,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: products.length,
-            itemBuilder: (context, index) {
-              return _buildProductCard(products[index]);
-            },
+            itemBuilder: (context, index) => _buildProductCard(products[index]),
           ),
         ),
       ],
@@ -351,70 +330,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   }
 
   Widget _buildProductCard(Product product) {
-    return Container(
-      width: 150,
-      margin: const EdgeInsets.only(right: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  product.imageUrl,
-                  height: 150,
-                  width: 150,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.yellowAccent,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    product.discount,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 4),
-          Text('${product.soldCount} sold this week', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(product.price, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        ],
+    final imageUrl = product.images.isNotEmpty ? product.images.first.url : 'https://via.placeholder.com/150';
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: product.id)),
+        );
+      },
+      child: Container(
+        width: 150,
+        margin: const EdgeInsets.only(right: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(imageUrl, height: 150, width: 150, fit: BoxFit.cover),
+            ),
+            const SizedBox(height: 8),
+            Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Text('${product.likeCount} likes', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+            const SizedBox(height: 4),
+            Text('${product.price} ₹', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildPolicySection() {
-    return Column(
-      children: const [
-        ExpansionTile(
-          title: Text("Free Flat Rate Shipping"),
-          trailing: Icon(Icons.keyboard_arrow_down),
-          children: [Padding(padding: EdgeInsets.all(16.0), child: Text("Details about free flat rate shipping."))],
-        ),
-        ExpansionTile(
-          title: Text("COD Policy"),
-          trailing: Icon(Icons.keyboard_arrow_down),
-          children: [Padding(padding: EdgeInsets.all(16.0), child: Text("Details about our Cash On Delivery policy."))],
-        ),
-        ExpansionTile(
-          title: Text("Return Policy"),
-          trailing: Icon(Icons.keyboard_arrow_down),
-          children: [Padding(padding: EdgeInsets.all(16.0), child: Text("Details about our return policy."))],
-        ),
-      ],
     );
   }
 
@@ -453,4 +395,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       ),
     );
   }
+
+  Future<void> _likeProduct() async {
+    if (product == null) return;
+    try {
+      final updatedCount = await _apiService.likeProduct(product!.id);
+      setState(() => product?.likeCount = updatedCount);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to like product: $e")),
+      );
+    }
+  }
 }
+*/

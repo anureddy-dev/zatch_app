@@ -1,35 +1,75 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:zatch_app/model/bit_response.dart';
+import 'package:flutter/material.dart';
+import 'package:zatch_app/model/ExploreApiRes.dart';
+import 'package:zatch_app/model/SearchHistoryResponse.dart';
+import 'package:zatch_app/model/SearchResultUser.dart';
+import 'package:zatch_app/model/TrendingBit.dart';
+import 'package:zatch_app/model/UpdateProfileResponse.dart';
+import 'package:zatch_app/model/api_response.dart';
+import 'package:zatch_app/model/bit_details.dart';
 import 'package:zatch_app/model/follow_response.dart';
+import 'package:zatch_app/model/live_session_res.dart';
 import 'package:zatch_app/model/product_response.dart';
 import 'package:zatch_app/model/register_req.dart';
 import 'package:zatch_app/model/register_response_model.dart';
 import 'package:zatch_app/model/login_request.dart';
 import 'package:zatch_app/model/login_response.dart';
+import 'package:zatch_app/model/share_profile_response.dart';
+import 'package:zatch_app/model/top_pick_res.dart' hide Product;
+import 'package:zatch_app/model/user_profile_model.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/model/verify_otp_request.dart';
 import 'package:zatch_app/model/verify_otp_response.dart';
 import 'package:zatch_app/model/otp_req.dart';
 import 'package:zatch_app/model/otp_response_model.dart';
 import 'package:zatch_app/model/categories_response.dart';
-import 'package:zatch_app/model/reels_video_model.dart';
 import 'package:zatch_app/utils/local_storage.dart';
+
+import '../model/bit_response.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
+
   factory ApiService() => _instance;
-  ApiService._internal();
+
+  ApiService._internal() {
+    // Add interceptor for 401
+    _dio.interceptors.add(InterceptorsWrapper(
+      onError: (e, handler) async {
+        if (e.response?.statusCode == 401) {
+          // Unauthorized → force logout
+          _token = null;
+          _dio.options.headers.remove("Authorization");
+          await LocalStorage.clearToken();
+
+          // Navigate to login page if possible
+          if (navigatorKey.currentState != null) {
+            Navigator.pushNamedAndRemoveUntil(
+              navigatorKey.currentState!.context,
+              '/login',
+                  (route) => false,
+            );
+          }
+        }
+        handler.next(e);
+      },
+    ));
+  }
 
   static const String baseUrl = "https://zatch-e9ye.onrender.com/api/v1";
   final Dio _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
     headers: {"Content-Type": "application/json"},
-    connectTimeout: const Duration(seconds: 200),
-    receiveTimeout: const Duration(seconds: 200),
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 40),
+    sendTimeout: const Duration(seconds: 15),
   ));
 
   String? _token;
+
+  static final GlobalKey<NavigatorState> navigatorKey =
+  GlobalKey<NavigatorState>();
 
   /// Initialize service: load token from storage if available
   Future<void> init() async {
@@ -47,7 +87,7 @@ class ApiService {
     LocalStorage.saveToken(token); // persist for next launch
   }
 
-  /// Helper: decode response safely
+  /// Common response decoder
   dynamic _decodeResponse(dynamic data) {
     if (data is String) {
       try {
@@ -59,10 +99,81 @@ class ApiService {
     return data;
   }
 
+  /// LOGOUT
+  Future<void> logoutUser() async {
+    try {
+      await _dio.post("/user/logout");
+    } catch (_) {
+      // ignore logout errors
+    }
+
+    // Clear token and headers
+    _token = null;
+    _dio.options.headers.remove("Authorization");
+    await LocalStorage.clearToken();
+
+    // Navigate to login page safely
+    if (navigatorKey.currentState != null) {
+      Navigator.pushNamedAndRemoveUntil(
+        navigatorKey.currentState!.context,
+        '/login',
+            (route) => false,
+      );
+    }
+  }
+
+  // Example GET method
+  Future<dynamic> get(String path) async {
+    try {
+      final response = await _dio.get(path);
+      return _decodeResponse(response.data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  // Example POST method
+  Future<dynamic> post(String path, {dynamic data}) async {
+    try {
+      final response = await _dio.post(path, data: data);
+      return _decodeResponse(response.data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  // Error handler
+  String _handleError(DioException e) {
+    if (e.response?.statusCode == 401) {
+      // Unauthorized → force logout
+      _token = null;
+      _dio.options.headers.remove("Authorization");
+      LocalStorage.clearToken();
+    }
+
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+        return "Connection timeout. Please try again.";
+      case DioExceptionType.sendTimeout:
+        return "Send timeout. Please try again.";
+      case DioExceptionType.receiveTimeout:
+        return "Receive timeout. Please try again.";
+
+      case DioExceptionType.badResponse:
+        return e.response?.data["message"] ?? "Server error occurred.";
+      case DioExceptionType.cancel:
+        return "Request cancelled.";
+      case DioExceptionType.unknown:
+      default:
+        return "Connection error. Please check your internet.";
+    }
+  }
+
   /// REGISTER
   Future<RegisterResponse> registerUser(RegisterRequest request) async {
     try {
-      final response = await _dio.post("/user/register", data: request.toJson());
+      final response = await _dio.post(
+          "/user/register", data: request.toJson());
       final data = _decodeResponse(response.data);
       final registerResponse = RegisterResponse.fromJson(data);
       setToken(registerResponse.token);
@@ -88,7 +199,8 @@ class ApiService {
   /// VERIFY OTP
   Future<VerifyOtpResponse> verifyOtp(VerifyOtpRequest request) async {
     try {
-      final response = await _dio.post("/twilio-sms/verify-otp", data: request.toJson());
+      final response = await _dio.post(
+          "/twilio-sms/verify-otp", data: request.toJson());
       final data = _decodeResponse(response.data);
       return VerifyOtpResponse.fromJson(data);
     } on DioException catch (e) {
@@ -99,7 +211,8 @@ class ApiService {
   /// SEND OTP
   Future<SendOtpResponse> sendOtp(SendOtpRequest request) async {
     try {
-      final response = await _dio.post("/twilio-sms/send-otp", data: request.toJson());
+      final response = await _dio.post(
+          "/twilio-sms/send-otp", data: request.toJson());
       final data = _decodeResponse(response.data);
       return SendOtpResponse.fromJson(data);
     } on DioException catch (e) {
@@ -131,24 +244,67 @@ class ApiService {
   }
 
   /// LIVE SESSIONS
-  Future<List> getLiveSessions() async {
+  Future<LiveSessionsResponse> getLiveSessions() async {
+    const String liveSessionsUrl = "https://zatch-e9ye.onrender.com/api/live/sessions";
     try {
-      final response = await _dio.get("/live/sessions");
+      final response = await _dio.get(liveSessionsUrl);
       final data = _decodeResponse(response.data);
-      final sessions = (data["sessions"] ?? []) as List<dynamic>;
-      return sessions.map((e) => ReelsVideo.fromJson(e)).toList();
+
+      if (data is Map<String, dynamic>) {
+        return LiveSessionsResponse.fromJson(data);
+      } else {
+        print("Error: Expected a Map for LiveSessionsResponse but got ${data
+            .runtimeType}");
+        throw Exception("Invalid data format received for live sessions.");
+      }
     } on DioException catch (e) {
       throw Exception(_handleError(e));
+    } catch (e) {
+      print("Error fetching live sessions: $e");
+      throw Exception("Failed to fetch live sessions: ${e.toString()}");
+    }
+  }
+
+  /// JOIN LIVE SESSION
+  Future<dynamic> joinLiveSession(String username) async {
+    final String joinUrl = "https://zatch-e9ye.onrender.com/api/live/session/$username/join";
+
+    try {
+      debugPrint("🔹 Joining live session for user: $username");
+
+      final response = await _dio.post(joinUrl);
+
+      if (response.statusCode == 200) {
+        debugPrint("Successfully joined live session for $username");
+        debugPrint("API Response: ${response.data}");
+        return response.data; // <-- return the response
+      } else {
+        debugPrint(
+            "Failed to join live session (${response.statusCode}): ${response
+                .data}");
+        throw Exception("Failed to join live session");
+      }
+    } on DioException catch (e) {
+      debugPrint("joinLiveSession DioException: ${e.response?.data}");
+      throw Exception(_handleError(e));
+    } catch (e) {
+      debugPrint("Unexpected error joining live session: $e");
+      throw Exception("Error joining live session: $e");
     }
   }
 
   /// TOGGLE FOLLOW
   Future<FollowResponse> toggleFollowUser(String targetUserId) async {
     try {
+      debugPrint("🔹 Toggling follow for userId: $targetUserId");
       final response = await _dio.post("/user/$targetUserId/toggleFollow");
+
       final data = _decodeResponse(response.data);
       return FollowResponse.fromJson(data);
     } on DioException catch (e) {
+      debugPrint("toggleFollowUser DioException: ${e.response?.data}");
+      debugPrint("toggleFollowUser Status code: ${e.response?.statusCode}");
+      debugPrint("toggleFollowUser Error: ${e.message}");
       throw Exception(_handleError(e));
     }
   }
@@ -165,34 +321,401 @@ class ApiService {
     }
   }
 
-  /// BITS
-  Future<List<Bit>> getBits() async {
+  Future<BitDetails> fetchBitDetails(String bitId) async {
+    final response = await _dio.get('/bits/$bitId');
+    if (response.statusCode == 200 && response.data['success'] == true) {
+      final bitResponse = BitDetailsResponse.fromJson(response.data);
+      return bitResponse.bit;
+    } else {
+      throw Exception('Failed to load bit details');
+    }
+  }
+
+  /// TERMS & CONDITIONS
+  Future<String> getTermsAndConditions() async {
+    try {
+      final response = await _dio.get("/terms-and-conditions");
+      return response.data.toString(); // HTML as string
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// PRIVACY POLICY
+  Future<String> getPrivacyPolicy() async {
+    try {
+      final response = await _dio.get("/privacy-policy");
+      return response.data.toString(); // HTML as string
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// Send OTP to email
+  Future<Map<String, dynamic>> sendEmailOtp(String email) async {
+    try {
+      final response = await _dio.post(
+          "/brevo/send-email-otp", data: {"email": email});
+      return _decodeResponse(response.data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// Verify OTP for email
+  Future<Map<String, dynamic>> verifyEmailOtp(String otp) async {
+    try {
+      final response = await _dio.post(
+          "/brevo/verify-email-otp", data: {"otp": otp});
+      return _decodeResponse(response.data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// Send OTP to phone
+  Future<Map<String, dynamic>> sendPhoneOtp(String countryCode,
+      String phoneNumber) async {
+    try {
+      final response = await _dio.post("/twilio-sms/send-otp", data: {
+        "countryCode": countryCode,
+        "phoneNumber": phoneNumber,
+      });
+      return _decodeResponse(response.data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// Verify OTP for phone
+  Future<Map<String, dynamic>> verifyPhoneOtp(String countryCode,
+      String phoneNumber, String otp) async {
+    try {
+      final response = await _dio.post("/twilio-sms/verify-otp", data: {
+        "countryCode": countryCode,
+        "phoneNumber": phoneNumber,
+        "otp": otp,
+      });
+      return _decodeResponse(response.data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// Send OTPs for both email and phone
+  Future<Map<String, dynamic>> sendBothOtp(String email, String countryCode,
+      String phoneNumber) async {
+    try {
+      final response = await _dio.post("/otp/send-both", data: {
+        "email": email,
+        "countryCode": countryCode,
+        "phoneNumber": phoneNumber,
+      });
+      return _decodeResponse(response.data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// Verify both OTPs
+  Future<Map<String, dynamic>> verifyBothOtp({
+    required String email,
+    required String emailOtp,
+    required String countryCode,
+    required String phoneNumber,
+    required String phoneOtp,
+  }) async {
+    try {
+      final response = await _dio.post("/otp/verify-both", data: {
+        "email": email,
+        "emailOtp": emailOtp,
+        "countryCode": countryCode,
+        "phoneNumber": phoneNumber,
+        "phoneOtp": phoneOtp,
+      });
+      return _decodeResponse(response.data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  Future<UpdateProfileResponse> updateUserProfile({
+    String? name,
+    String? gender,
+    String? dob,
+    String? email,
+    String? phone,
+    String? countryCode,
+    String? otp,
+    String? otpType, // "email", "phone", "both" or null
+  }) async {
+    try {
+      final Map<String, dynamic> data = {};
+
+      if (name != null && name.isNotEmpty) data['name'] = name;
+      if (gender != null && gender.isNotEmpty) data['gender'] = gender;
+      if (dob != null && dob.isNotEmpty) data['dob'] = dob;
+      if (email != null && email.isNotEmpty) data['email'] = email;
+      if (phone != null && phone.isNotEmpty) {
+        data['phone'] = phone;
+        if (countryCode != null && countryCode.isNotEmpty) {
+          data['countryCode'] = countryCode;
+        }
+      }
+
+      if ((email != null || phone != null) && otp != null && otpType != null) {
+        data['otp'] = otp;
+        data['otpType'] = otpType;
+      }
+
+      print("Update Profile Request Data: $data");
+
+      final response = await _dio.put("/user/profile-update", data: data);
+
+      print("Update Profile Response: ${response.data}");
+
+      return UpdateProfileResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// SHARE PROFILE
+  Future<ShareProfileResponse> shareUserProfile(String userId) async {
+    try {
+      final response = await _dio.get("/user/share-profile/$userId");
+      final data = _decodeResponse(response.data);
+      return ShareProfileResponse.fromJson(data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// GET Single Product
+  Future<Product> getSingleProduct(String productId) async {
+    try {
+      final response = await _dio.get("/product/$productId");
+      final data = _decodeResponse(response.data);
+
+      if (data["success"] == true && data["product"] != null) {
+        return Product.fromJson(data["product"]);
+      } else {
+        throw Exception(data["message"] ?? "Failed to fetch product");
+      }
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// TOP PICKS
+  Future<List<Product>> getTopPicks() async {
+    try {
+      final response = await _dio.get("/product/top-picks");
+      final data = _decodeResponse(response.data);
+      final topPickResponse = TopPicksResponse.fromJson(data);
+
+      if (topPickResponse.success) {
+        return topPickResponse.products;
+      } else {
+        throw Exception(topPickResponse.message);
+      }
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  Future<Product> getProductById(String productId) async {
+    try {
+      final response = await _dio.get("/product/$productId");
+
+      if (response.statusCode == 200 && response.data["success"] == true) {
+        return Product.fromJson(response.data["product"]);
+      } else {
+        throw Exception(response.data["message"] ?? "Failed to fetch product");
+      }
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data is Map &&
+          e.response?.data["message"] != null
+          ? e.response?.data["message"]
+          : e.message ?? "API Error";
+
+      throw Exception(errorMessage);
+    } catch (e) {
+      throw Exception("Unexpected error: $e");
+    }
+  }
+
+
+  Future<int> likeProduct(String productId) async {
+    try {
+      final response = await _dio.post("/product/$productId/like");
+      final data = response.data;
+
+      if (data['success'] == true) {
+        return data['likeCount'] ?? 0;
+      } else {
+        throw Exception(data['message'] ?? 'Failed to like product');
+      }
+    } catch (e) {
+      throw Exception('Error liking product: $e');
+    }
+  }
+
+  Future<ApiResponse> getAllUsers() async {
+    try {
+      final response = await _dio.get("/user/all-users");
+      final data = _decodeResponse(response.data);
+      return ApiResponse.fromJson(data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    } catch (e) {
+      print("Error in getAllUsers: $e");
+      throw Exception("Failed to fetch all users: ${e.toString()}");
+    }
+  }
+
+  /// TRENDING BITS
+  Future<List<TrendingBit>> fetchTrendingBits() async {
+    try {
+      final response = await _dio.get("/bits/trending");
+      final data = _decodeResponse(response.data);
+
+      if (data is Map<String, dynamic> && data.containsKey('trendingBits')) {
+        final List bitsJson = data['trendingBits'] ?? [];
+        return bitsJson.map((json) => TrendingBit.fromJson(json)).toList();
+      } else {
+        throw Exception('Unexpected data format for trending bits.');
+      }
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    } catch (e) {
+      throw Exception("Failed to fetch trending bits: $e");
+    }
+  }
+
+  /// Get the user's search history
+  Future<SearchHistoryResponse> getUserSearchHistory() async {
+    try {
+      final response = await _dio.get("/user/search-history");
+      final data = _decodeResponse(response.data);
+      return SearchHistoryResponse.fromJson(data);
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// Get popular/explore bits
+  Future<List<Bits>> getExploreBits() async {
     try {
       final response = await _dio.get("/bits/list");
       final data = _decodeResponse(response.data);
-      final bitsResponse = BitsResponse.fromJson(data);
+      final bitsResponse = ExploreApiResponse.fromJson(data);
       return bitsResponse.bits;
     } on DioException catch (e) {
       throw Exception(_handleError(e));
     }
   }
 
-  /// Common error handler
-  String _handleError(DioException e) {
-    switch (e.type) {
-      case DioExceptionType.connectionTimeout:
-        return "Connection timeout. Please try again.";
-      case DioExceptionType.sendTimeout:
-        return "Send timeout. Please try again.";
-      case DioExceptionType.receiveTimeout:
-        return "Receive timeout. Please try again.";
-      case DioExceptionType.badResponse:
-        return e.response?.data["message"] ?? "Server error occurred.";
-      case DioExceptionType.cancel:
-        return "Request cancelled.";
-      case DioExceptionType.unknown:
-      default:
-        return "Connection error. Please check your internet.";
+  Future<SearchResult> search(String query) async {
+    if (query.isEmpty) {
+      return SearchResult(success: false,
+          message: "Empty query",
+          products: [],
+          people: [],
+          all: []);
+    }
+
+    try {
+      final response = await _dio.get(
+          "/search/search", queryParameters: {"query": query});
+      final data = _decodeResponse(response.data);
+
+      print("🔹 Search API Response: $data"); // debug log
+
+      return SearchResult.fromJson(data);
+    } on DioException catch (e) {
+      final msg = _handleError(e);
+      print("❌ Search API Error: $msg");
+      throw Exception(msg);
+    } catch (e) {
+      print("❌ Search API Unexpected Error: $e");
+      throw Exception("Unexpected error: $e");
     }
   }
+
+  Future<UserProfile> getUserProfileById(String userId) async {
+    try {
+      debugPrint("🔹 Fetching profile for userId: $userId");
+      final response = await _dio.get("/user/profile/$userId");
+
+      if (response.statusCode == 200 && response.data["success"] == true) {
+        debugPrint("✅ Other user profile fetched");
+        return UserProfile.fromJson(response.data);
+      } else {
+        throw Exception(response.data["message"] ?? "Failed to fetch profile");
+      }
+    } on DioException catch (e) {
+      debugPrint("❌ DioException (getUserProfileById): ${e.response?.data}");
+      throw Exception(_handleError(e));
+    }
+  }
+
+  /// CHANGE PASSWORD
+  Future<Map<String, dynamic>> changePassword({
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    try {
+      final response = await _dio.put(
+        "/user/change-password",
+        data: {
+          'newPassword': newPassword,
+          'confirmPassword': confirmPassword,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $_token',
+          },
+        ),
+      );
+
+      // Log response for debugging
+      debugPrint("🔹 Change Password Response: ${response.data}");
+
+      // Decode and normalize response
+      dynamic decoded = response.data;
+      if (decoded is String) {
+        try {
+          decoded = jsonDecode(decoded);
+        } catch (_) {
+          decoded = jsonDecode('{${decoded.trim()}}');
+        }
+      }
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      } else {
+        return {
+          'success': false,
+          'message': 'Unexpected response format from server.',
+        };
+      }
+    } on DioException catch (e) {
+      debugPrint("❌ DioException (changePassword): ${e.response?.data}");
+      return {
+        'success': false,
+        'message': e.response?.data is Map
+            ? e.response?.data['message'] ?? 'Password change failed'
+            : _handleError(e),
+      };
+    } catch (e) {
+      debugPrint("❌ Unexpected error (changePassword): $e");
+      return {
+        'success': false,
+        'message': 'Unexpected error: $e',
+      };
+    }
+  }
+
+
 }

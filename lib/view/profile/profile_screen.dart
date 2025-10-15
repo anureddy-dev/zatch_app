@@ -1,8 +1,15 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:zatch_app/model/carts_model.dart';
+import 'package:zatch_app/model/user_profile_model.dart';
+import 'package:zatch_app/services/api_service.dart';
+import 'package:zatch_app/view/zatching_details_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, required Map<String, String> person});
+  final String? userId;
+  const ProfileScreen({super.key, this.userId});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -10,33 +17,105 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
-  final List<String> images = [
-    "https://picsum.photos/id/1011/400/600",
-    "https://picsum.photos/id/1012/400/400",
-    "https://picsum.photos/id/1015/400/500",
-    "https://picsum.photos/id/1016/400/600",
-    "https://picsum.photos/id/1020/400/500",
-    "https://picsum.photos/id/1021/400/500",
-  ];
-
-  final List<String> shopImages = [
-    "https://picsum.photos/id/201/400/500",
-    "https://picsum.photos/id/202/400/600",
-    "https://picsum.photos/id/203/400/400",
-  ];
-  final List<String> liveImages = [
-    "https://picsum.photos/id/301/400/400",
-    "https://picsum.photos/id/302/500/500",
-  ];
-
   late TabController _tabController;
   final List<String> _tabs = ["Buy Bits", "Shop", "Upcoming Live"];
+
+  UserProfile? _userProfile;
+  bool _isLoading = true;
+  bool _isFollowing = false;
+  bool _isSharing = false;
+  bool _isFollowLoading = false;
+   late Zatch zatch;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _fetchUserProfile();
   }
+  void _showMessage(String title, String message, {bool isError = false}) {
+    if (!mounted) return;
+    Flushbar(
+      title: title,
+      message: message,
+      duration: const Duration(seconds: 3),
+      backgroundColor: isError ? Colors.red : Colors.green,
+      margin: const EdgeInsets.all(8),
+      borderRadius: BorderRadius.circular(8),
+      icon: Icon(
+        isError ? Icons.error_outline : Icons.check_circle_outline,
+        size: 28.0,
+        color: Colors.white,
+      ),
+      flushbarPosition: FlushbarPosition.TOP,
+    ).show(context);
+  }
+
+  Future<void> _fetchUserProfile() async {
+    if (widget.userId == null) {
+      debugPrint("⚠️ No userId provided for ProfileScreen");
+      setState(() => _isLoading = false);
+      return;
+    }
+    debugPrint("❌ Error fetching profile: ${widget.userId!}");
+
+    try {
+      final profile = await ApiService().getUserProfileById(widget.userId!);
+      setState(() {
+        _userProfile = profile;
+        _isFollowing = profile.followers.isNotEmpty;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint("❌ Error fetching profile: $e");
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _onFollowPressed() async {
+    if (widget.userId == null) return;
+    setState(() => _isFollowLoading = true);
+
+    try {
+      final res = await ApiService().toggleFollowUser(widget.userId!);
+
+      setState(() {
+        _isFollowing = !_isFollowing;
+        _isFollowLoading = false;
+      });
+
+      final message = _isFollowing
+          ? "You are now following ${_userProfile?.username ?? 'this user'}"
+          : "You unfollowed ${_userProfile?.username ?? 'this user'}";
+      _showMessage(_isFollowing ? "Followed" : "Unfollowed", message);
+
+    } catch (e) {
+      setState(() => _isFollowLoading = false);
+    }
+  }
+
+
+  Future<void> _onSharePressed() async {
+    if (widget.userId == null) return;
+    setState(() => _isSharing = true);
+
+    try {
+      final res = await ApiService().shareUserProfile(widget.userId!);
+      setState(() => _isSharing = false);
+
+      if (res.profileData != null) {
+        await Share.share("Check out this Zatch profile: ${res.profileData}");
+      } else {
+        _showMessage("Share Failed", "No share link available.", isError: true);
+      }
+    } catch (e) {
+      setState(() => _isSharing = false);
+    }
+  }
+
+  /*void _onMessagePressed() {
+    _showMessage("Coming Soon", "The message feature is not available yet.");
+  }*/
 
   @override
   void dispose() {
@@ -47,121 +126,128 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(leading: IconButton(
-        onPressed: () {},
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-      ),backgroundColor:  Color(0xFF9CDD1F),),
+      appBar: AppBar(
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF9CDD1F),
+      ),
       backgroundColor: const Color(0xFF9CDD1F),
-      body: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Column(
-            children: [
-              // Green background
-              Container(
-                height: 50,
-                width: double.infinity,
-                color: const Color(0xFF9CDD1F),
-              ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          : _userProfile == null
+          ? const Center(child: Text("User not found"))
+          : _buildBody(),
+    );
+  }
 
-              // White rounded body
-              Expanded(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(40),
-                      topRight: Radius.circular(40),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 120), // space for profile overlap
-                      _buildStats(),
-                      const SizedBox(height: 16),
-                      _buildActionButtons(),
-                      const SizedBox(height: 16),
-                      _buildTabBar(),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: TabBarView(
-                          controller: _tabController,
-                          children: [
-                            _buildGalleryView(images),
-                            _buildShopView(),          
-                            _buildLiveView(),
-                          ],
-                        ),
-                      ),
-                    ],
+  Widget _buildBody() {
+    final user = _userProfile!;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Column(
+          children: [
+            Container(height: 50, color: const Color(0xFF9CDD1F)),
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(40),
+                    topRight: Radius.circular(40),
                   ),
                 ),
-              ),
-            ],
-          ),
-
-          // ✅ Overlayed profile section
-          Positioned(
-            top: 8, // sits between green & white
-            left: 0,
-            right: 0,
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const CircleAvatar(
-                    radius: 50,
-                    backgroundImage:
-                    NetworkImage("https://i.pravatar.cc/150?img=47"),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text(
-                      "Ankitha Lauren",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 120),
+                    _buildStats(user),
+                    const SizedBox(height: 16),
+                    _buildActionButtons(),
+                    const SizedBox(height: 16),
+                    _buildTabBar(),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildGalleryView(user),
+                          _buildShopView(user),
+                          _buildLiveView(),
+                        ],
                       ),
                     ),
-                    SizedBox(width: 6),
-                    Icon(Icons.verified,
-                        size: 18, color: Colors.lightBlueAccent),
                   ],
                 ),
-                const Text(
-                  "215.1k Followers",
-                  style: TextStyle(color: Colors.black54, fontSize: 14),
-                ),
-              ],
+              ),
             ),
+          ],
+        ),
+        _buildProfileHeader(user),
+      ],
+    );
+  }
+
+  Widget _buildProfileHeader(UserProfile user) {
+    return Positioned(
+      top: 8,
+      left: 0,
+      right: 0,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: CircleAvatar(
+              radius: 50,
+              backgroundImage: user.profilePicUrl != null
+                  ? NetworkImage(user.profilePicUrl!)
+                  : const NetworkImage("https://via.placeholder.com/150"),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                user.username ?? "Unnamed User",
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87),
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.verified,
+                  size: 18, color: Colors.lightBlueAccent),
+            ],
+          ),
+          Text(
+            "${user.followerCount} Followers",
+            style: const TextStyle(color: Colors.black54, fontSize: 14),
           ),
         ],
       ),
     );
   }
-  Widget _buildStats() {
+
+  Widget _buildStats(UserProfile user) {
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: const [
-          _StatItem(value: "4.9 ⭐", label: "Customer Rating"),
-          _StatItem(value: "36.6k", label: "Reviews"),
-          _StatItem(value: "360", label: "Products Sold"),
+        children: [
+          _StatItem(value: "${user.customerRating} ⭐", label: "Customer Rating"),
+          _StatItem(value: "${user.reviewsCount}", label: "Reviews"),
+          _StatItem(value: "${user.productsSoldCount}", label: "Products Sold"),
         ],
       ),
     );
   }
 
-  // ✅ Chat, Follow, Share
   Widget _buildActionButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -171,34 +257,58 @@ class _ProfileScreenState extends State<ProfileScreen>
           CircleAvatar(
             radius: 24,
             backgroundColor: Colors.grey.shade200,
-            child: const Icon(Icons.chat_bubble_outline, color: Colors.black54),
+            child: IconButton(
+              icon: const Icon(Icons.chat_bubble_outline, color: Colors.black54),
+              onPressed: (){
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ZatchingDetailsScreen(zatch: zatch),
+                  ),
+                );              },
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF9CDD1F),
+              backgroundColor:
+              _isFollowing ? Colors.grey.shade300 : const Color(0xFF9CDD1F),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
+                  borderRadius: BorderRadius.circular(30)),
               padding:
               const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
               elevation: 2,
             ),
-            onPressed: () {},
-            child: const Text("Follow",
-                style: TextStyle(
-                    color: Colors.black, fontWeight: FontWeight.bold)),
+            onPressed: _isFollowLoading ? null : _onFollowPressed,
+            child: _isFollowLoading
+                ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+                : Text(
+              _isFollowing ? "Following" : "Follow",
+              style: const TextStyle(
+                  color: Colors.black, fontWeight: FontWeight.bold),
+            ),
           ),
           CircleAvatar(
             radius: 24,
             backgroundColor: Colors.grey.shade200,
-            child: const Icon(Icons.share, color: Colors.black54),
+            child: IconButton(
+              icon: _isSharing
+                  ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.share, color: Colors.black54),
+              onPressed: _isSharing ? null : _onSharePressed,
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ✅ Rounded TabBar
   Widget _buildTabBar() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 30),
@@ -237,9 +347,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ✅ Gallery View
-  Widget _buildGalleryView(List<String> imageList) {
-    if (imageList.isEmpty) {
+  Widget _buildGalleryView(UserProfile user) {
+    final gallery = user.sellingProducts
+        .map<String>((e) => e['image']?['url'] ?? '')
+        .where((url) => url.isNotEmpty)
+        .toList();
+
+    if (gallery.isEmpty) {
       return const Center(
         child: Text(
           "No items to display yet!",
@@ -247,170 +361,118 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       );
     }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: MasonryGridView.count(
         crossAxisCount: 2,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        itemCount: imageList.length,
+        itemCount: gallery.length,
         itemBuilder: (context, index) {
           return ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: Image.network(imageList[index], fit: BoxFit.cover),
+            child: Image.network(gallery[index], fit: BoxFit.cover),
           );
         },
       ),
     );
   }
-}
 
-Widget _buildShopView() {
-  final products = [
-    {"title": "Club Fleece Mens Jacket", "price": "₹ 56.97", "img": "https://picsum.photos/id/201/400/500"},
-    {"title": "Skate Jacket", "price": "₹ 150.97", "img": "https://picsum.photos/id/202/400/500"},
-    {"title": "Puffer Jacket", "price": "₹ 99.99", "img": "https://picsum.photos/id/203/400/500"},
-  ];
+  Widget _buildShopView(UserProfile user) {
+    final products = user.sellingProducts;
 
-  return GridView.builder(
-    padding: const EdgeInsets.all(16),
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 0.7,
-    ),
-    itemCount: products.length,
-    itemBuilder: (context, index) {
-      final product = products[index];
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 3),
-            )
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Image.network(product["img"]!, fit: BoxFit.cover, width: double.infinity),
+    if (products.isEmpty) {
+      return const Center(child: Text("No products available"));
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.7,
+      ),
+      itemCount: products.length,
+      itemBuilder: (context, index) {
+        final product = products[index];
+        final img = product['image']?['url'] ?? '';
+        final title = product['name'] ?? 'Unnamed';
+        final price = product['price']?.toString() ?? '';
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              )
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Image.network(
+                    img,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    errorBuilder: (c, o, s) => Container(
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.image_not_supported),
+                    ),
+                  ),
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(product["title"]!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Text(product["price"]!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      );
-    },
-  );
-}
-Widget _buildLiveView() {
-  final events = [
-    {"date": "Tomorrow · 7:30PM", "title": "Nike Sneaker Collection", "img": "https://picsum.photos/id/301/500/500"},
-    {"date": "7th July · 7:30PM", "title": "Nike Sneaker Collection", "img": "https://picsum.photos/id/302/500/500"},
-  ];
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(title,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500)),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(price,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-  return ListView.builder(
-    padding: const EdgeInsets.all(16),
-    itemCount: events.length,
-    itemBuilder: (context, index) {
-      final event = events[index];
-      return Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 3),
-            )
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: Image.network(event["img"]!, fit: BoxFit.cover, width: double.infinity, height: 200),
-                ),
-                Positioned(
-                  top: 10,
-                  left: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      event["date"]!,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                ),
-                const Positioned.fill(
-                  child: Center(
-                    child: Icon(Icons.play_circle_fill, size: 50, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(event["title"]!, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4),
-              child: Text("Fashion", style: TextStyle(fontSize: 13, color: Colors.black54)),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      );
-    },
-  );
+  Widget _buildLiveView() {
+    return const Center(child: Text("No live events available yet"));
+  }
 }
-
 
 class _StatItem extends StatelessWidget {
   final String value;
   final String label;
-
   const _StatItem({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-              fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
-        ),
+        Text(value,
+            style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87)),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Colors.black54),
-        ),
+        Text(label,
+            style: const TextStyle(fontSize: 12, color: Colors.black54)),
       ],
     );
   }

@@ -32,6 +32,9 @@ class User {
   final String countryCode;
   final String phone;
   final String email;
+  final String? dob;
+  final String gender;
+  final String password;
   final ProfilePic profilePic;
   final List<dynamic> followers;
   final List<dynamic> following;
@@ -50,7 +53,10 @@ class User {
     required this.username,
     required this.countryCode,
     required this.phone,
+    required this.dob,
     required this.email,
+    required this.gender,
+    required this.password,
     required this.profilePic,
     required this.followers,
     required this.following,
@@ -71,7 +77,10 @@ class User {
       username: json['username'] ?? '',
       countryCode: json['countryCode'] ?? '',
       phone: json['phone'] ?? '',
+      dob: json['dob'] ?? '',
       email: json['email'] ?? '',
+      gender: json['gender'] ?? '',
+      password: json['password'] ?? '',
       profilePic: ProfilePic.fromJson(json['profilePic'] ?? {}),
       followers: List<dynamic>.from(json['followers'] ?? []),
       following: List<dynamic>.from(json['following'] ?? []),
@@ -94,6 +103,9 @@ class User {
       'countryCode': countryCode,
       'phone': phone,
       'email': email,
+      'dob': dob,
+      'gender': gender,
+      'password': password,
       'profilePic': profilePic.toJson(),
       'followers': followers,
       'following': following,

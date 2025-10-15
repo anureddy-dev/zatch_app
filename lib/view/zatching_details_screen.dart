@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/carts_model.dart';
+import 'package:zatch_app/view/cart_screen.dart';
 
 class ZatchingDetailsScreen extends StatelessWidget {
   final Zatch zatch;
@@ -11,7 +12,7 @@ class ZatchingDetailsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text("Zatching", style: TextStyle(color: Colors.black)),
+        title: Center(child: const Text("Zatching", style: TextStyle(color: Colors.black))),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -28,9 +29,9 @@ class ZatchingDetailsScreen extends StatelessWidget {
                 _offerCard(context),
                 const SizedBox(height: 16),
 
-                if (zatch.status == "Zatch Expired") _expiredSection(),
-                if (zatch.status == "Offer Rejected") _offerRejectedSection(),
-                if (zatch.status == "Seller Offer") _sellerOfferSection(),
+                if (zatch.status == "Zatch Expired") _expiredSection(context),
+                if (zatch.status == "Offer Rejected") _offerRejectedSection(context),
+                if (zatch.status == "Seller Offer") _sellerOfferSection(context),
               ],
             ),
           ),
@@ -115,7 +116,7 @@ class ZatchingDetailsScreen extends StatelessWidget {
   }
 
   /// ⏳ Expired Section
-  Widget _expiredSection() {
+  Widget _expiredSection(BuildContext context) {
     return Column(
       children: [
         _statusBubble(
@@ -127,13 +128,13 @@ class ZatchingDetailsScreen extends StatelessWidget {
           title: "Zatch Expired",
         ),
         const SizedBox(height: 12),
-        _priceCard("Original Price", showAddToCart: true),
+        _priceCard("Original Price", showAddToCart: true,context:   context),
       ],
     );
   }
 
   /// ❌ Offer Rejected
-  Widget _offerRejectedSection() {
+  Widget _offerRejectedSection(BuildContext context) {
     return Column(
       children: [
         _statusBubble(
@@ -146,13 +147,13 @@ class ZatchingDetailsScreen extends StatelessWidget {
           title: "Offer Rejected",
         ),
         const SizedBox(height: 12),
-        _priceCard("Original Price", showAddToCart: true),
+        _priceCard("Original Price", showAddToCart: true,context: context),
       ],
     );
   }
 
   /// 🟡 Seller Offer
-  Widget _sellerOfferSection() {
+  Widget _sellerOfferSection(BuildContext context) {
     return Column(
       children: [
         _statusBubble(
@@ -165,7 +166,7 @@ class ZatchingDetailsScreen extends StatelessWidget {
           title: "Seller Offer",
         ),
         const SizedBox(height: 12),
-        _priceCard("Seller Offer", showAddToCart: true, showPay: true),
+        _priceCard("Seller Offer", showAddToCart: true, showPay: true,context: context),
       ],
     );
   }
@@ -209,7 +210,7 @@ class ZatchingDetailsScreen extends StatelessWidget {
 
   /// 📦 Price Card
   Widget _priceCard(String title,
-      {bool showAddToCart = false, bool showPay = false}) {
+      {bool showAddToCart = false, bool showPay = false, required BuildContext context}) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -297,7 +298,14 @@ class ZatchingDetailsScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CartScreen(),
+                    ),
+                  );
+                },
                 child: const Text("Add To Cart"),
               ),
             ),

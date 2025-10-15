@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/login_response.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
+import 'package:zatch_app/view/cart_screen.dart';
 import 'package:zatch_app/view/search_view/search_screen.dart';
+
+import '../view/setting_view/profile_screen.dart';
 
 class HeaderWidget extends StatelessWidget {
   UserProfileResponse? userProfile;
+  final VoidCallback? onSearchTap;
 
-   HeaderWidget(this.userProfile, {super.key});
+
+  HeaderWidget(this.userProfile, {super.key,this.onSearchTap});
 
   @override
   Widget build(BuildContext context) {
@@ -22,48 +27,55 @@ class HeaderWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// Top Row: Greeting + Icons
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Greeting + Name
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Hello, Welcome 👋',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
+                    'Hello, Zatcher 👋',
+                    style: TextStyle(fontSize: 14, color: Colors.black),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    // ✅ Use name from LoginResponse
-                    userProfile?.user.username ?? '',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                  GestureDetector(onTap: (){
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProfileScreen(userProfile),
+                      ),
+                    );
+                  },
+                    child: Text(
+                      userProfile?.user.username ?? '',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
                     ),
                   ),
                 ],
               ),
-
-              // ✅ Icons (same as before)
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.bookmark_border, color: Colors.black),
+                    icon: const Icon(
+                      Icons.bookmark_border,
+                      color: Colors.black,
+                    ),
                     onPressed: () {
-                      Navigator.pushNamed(context, '/help');
+                      Navigator.pushNamed(context, '/wishlist');
                     },
                   ),
                   IconButton(
                     icon: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        const Icon(Icons.notifications_none, color: Colors.black),
+                        const Icon(
+                          Icons.notifications_none,
+                          color: Colors.black,
+                        ),
                         Positioned(
                           right: -2,
                           top: -2,
@@ -86,10 +98,13 @@ class HeaderWidget extends StatelessWidget {
                     icon: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        const Icon(Icons.shopping_cart_outlined, color: Colors.black),
+                        const Icon(
+                          Icons.shopping_cart_outlined,
+                          color: Colors.black,
+                        ),
                         Positioned(
                           right: -2,
-                          top: -2,
+                          top: -8,
                           child: Container(
                             padding: const EdgeInsets.all(2),
                             decoration: const BoxDecoration(
@@ -109,28 +124,28 @@ class HeaderWidget extends StatelessWidget {
                       ],
                     ),
                     onPressed: () {
-                      Navigator.pushNamed(context, '/orders');
-                    },
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CartScreen(),
+                        ),
+                      );                    },
                   ),
                 ],
-              )
+              ),
             ],
           ),
 
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SearchScreen()),
-              );
-            },
+            onTap: onSearchTap
+            ,
             child: AbsorbPointer(
               child: Container(
                 decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15.0),
-              ),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15.0),
+                ),
                 child: TextField(
                   readOnly: true,
                   decoration: const InputDecoration(
@@ -141,8 +156,7 @@ class HeaderWidget extends StatelessWidget {
                 ),
               ),
             ),
-          )
-
+          ),
         ],
       ),
     );

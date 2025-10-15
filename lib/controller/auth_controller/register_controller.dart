@@ -7,13 +7,15 @@ import 'package:zatch_app/view/auth_view/OtpScreenRegister.dart';
 class RegisterController {
   final api = ApiService();
 
-  // Register user and send OTP
   Future<void> registerUser({
     required BuildContext context,
     required String username,
     required String password,
     required String countryCode,
     required String phone,
+    required String gender,
+    required String email,
+    required Function(String title, String message, {bool isError}) showMessage,
   }) async {
     try {
       final request = RegisterRequest(
@@ -21,15 +23,14 @@ class RegisterController {
         password: password,
         countryCode: countryCode,
         phone: phone,
+        gender: gender,
+        email: email,
       );
-
-      // call API
       final RegisterResponse result = await api.registerUser(request);
+      if (!Navigator.of(context).mounted) return;
 
       if (result.success) {
         debugPrint("Registration Success: ${result.message}");
-
-        // navigate to OTP screen
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -39,18 +40,13 @@ class RegisterController {
             ),
           ),
         );
-
       } else {
         debugPrint("Registration Failed: ${result.message}");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result.message)),
-        );
+        showMessage("Registration Failed", result.message, isError: true);
       }
     } catch (e) {
       debugPrint(" Register Exception: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Something went wrong: $e")),
-      );
+      showMessage("An Error Occurred", "Something went wrong. Please try again.", isError: true);
     }
   }
 }

@@ -1,4 +1,5 @@
 class BargainPick {
+  final String id;
   final String title;
   final String subtitle;
   final String videoAsset;
@@ -7,6 +8,7 @@ class BargainPick {
   final String thumbnail; // new field
 
   BargainPick({
+    required this.id,
     required this.title,
     required this.subtitle,
     required this.videoAsset,
