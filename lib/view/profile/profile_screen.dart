@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:zatch_app/model/carts_model.dart';
 import 'package:zatch_app/model/user_profile_model.dart';
 import 'package:zatch_app/services/api_service.dart';
+import 'package:zatch_app/view/product_view/product_detail_screen.dart';
 import 'package:zatch_app/view/zatching_details_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -131,9 +132,9 @@ class _ProfileScreenState extends State<ProfileScreen>
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back, color: Colors.white),
         ),
-        backgroundColor: const Color(0xFF9CDD1F),
+        backgroundColor: const Color(0xFFA3DD00),
       ),
-      backgroundColor: const Color(0xFF9CDD1F),
+      backgroundColor: const Color(0xFFA3DD00),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
           : _userProfile == null
@@ -149,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       children: [
         Column(
           children: [
-            Container(height: 50, color: const Color(0xFF9CDD1F)),
+            Container(height: 50, color: const Color(0xFFA3DD00)),
             Expanded(
               child: Container(
                 decoration: const BoxDecoration(
@@ -263,15 +264,31 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ZatchingDetailsScreen(zatch: zatch),
+                    builder: (_) => ZatchingDetailsScreen(
+                      zatch: Zatch(
+                        id: "3",
+                        name: "Modern light clothes",
+                        description: "Dress modern",
+                        seller: "Neu Fashions, Hyderabad",
+                        imageUrl: "https://picsum.photos/202/300",
+                        active: false,
+                        status: "Offer Rejected",
+                        quotePrice: "212.99 ₹",
+                        sellerPrice: "800 ₹",
+                        quantity: 4,
+                        subTotal: "800 ₹",
+                        date: "Yesterday 12:00PM",
+                      ),
+                    ),
                   ),
-                );              },
+                );
+                  },
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor:
-              _isFollowing ? Colors.grey.shade300 : const Color(0xFF9CDD1F),
+              _isFollowing ? Colors.grey.shade300 : const Color(0xFFCCF656),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30)),
               padding:
@@ -383,78 +400,155 @@ class _ProfileScreenState extends State<ProfileScreen>
     final products = user.sellingProducts;
 
     if (products.isEmpty) {
-      return const Center(child: Text("No products available"));
+      return const Center(
+          child: Text("No products available",
+              style: TextStyle(color: Colors.grey)));
     }
 
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.7,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 0.75,
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {
         final product = products[index];
         final img = product['image']?['url'] ?? '';
-        final title = product['name'] ?? 'Unnamed';
-        final price = product['price']?.toString() ?? '';
-
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              )
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: Image.network(
-                    img,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    errorBuilder: (c, o, s) => Container(
-                      color: Colors.grey.shade300,
-                      child: const Icon(Icons.image_not_supported),
-                    ),
-                  ),
-                ),
+        final title = product['name'] ?? 'Unnamed Product';
+        final priceValue = product['price'];
+        final price = priceValue is num
+            ? '₹ ${priceValue.toStringAsFixed(2)}'
+            : '₹ ${priceValue?.toString() ?? '0.00'}';
+        return _ProductCard(
+          imageUrl: img,
+          title: title,
+          price: price,
+          onTap: () {
+            final productId = product['_id'] as String?;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProductDetailScreen( productId: productId ?? ''),
               ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(title,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w500)),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Text(price,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+            );            debugPrint("Tapped on product: $title");
+          },
+          onIconTap: () {
+            debugPrint("Icon tapped for product: $title");
+          },
         );
       },
     );
   }
+} // End of _ProfileScreenState class
 
+// --- NEW WIDGET: Reusable Product Card based on Figma Design ---
+class _ProductCard extends StatelessWidget {
+  final String imageUrl;
+  final String title;
+  final String price;
+  final VoidCallback onTap;
+  final VoidCallback onIconTap;
+
+  const _ProductCard({
+    required this.imageUrl,
+    required this.title,
+    required this.price,
+    required this.onTap,
+    required this.onIconTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        // Main card container
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4F4F4), // Bg-Light-2 from Figma
+          borderRadius: BorderRadius.circular(8),
+        ),
+        clipBehavior: Clip.antiAlias, // Ensures children respect the border radius
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- Image Section with Overlay Icon ---
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Product Image
+                  Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Center(
+                      child: Icon(Icons.image_not_supported, color: Colors.grey),
+                    ),
+                  ),
+                  // Icon Button Overlay
+                  Positioned(
+                    top: 5,
+                    right: 5,
+                    child: GestureDetector(
+                      onTap: onIconTap,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.85),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.favorite_border, // Example Icon
+                          color: Colors.black,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // --- Text Section ---
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF272727), // Black-100 from Figma
+                  fontSize: 12,
+                  fontFamily: 'Encode Sans',
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
+              child: Text(
+                price,
+                style: const TextStyle(
+                  color: Color(0xFF272727), // Black-100 from Figma
+                  fontSize: 12,
+                  fontFamily: 'Encode Sans',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
   Widget _buildLiveView() {
     return const Center(child: Text("No live events available yet"));
   }
-}
+
 
 class _StatItem extends StatelessWidget {
   final String value;

@@ -15,7 +15,6 @@ class SeeAllBargainPicksScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // You can tune these to control card image proportions.
     const double cardImageWidth = 160.0;
     const double cardImageHeight = 220.0;
 
@@ -52,7 +51,7 @@ class SeeAllBargainPicksScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (_) => ReelDetailsScreen(
-                    bitId: pick.id,
+                    bitId: /*pick.id*/"68a2772c675bafdd4204ef0b",
                     controller: LiveStreamController(),
                   ),
                 ),

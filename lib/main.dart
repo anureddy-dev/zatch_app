@@ -5,9 +5,7 @@ import 'package:zatch_app/view/auth_view/register_screen.dart';
 import 'package:zatch_app/view/auth_view/welcome.dart';
 import 'package:zatch_app/view/help_screen.dart';
 import 'package:zatch_app/view/splash_route_decider.dart';
-
-import 'Widget/explore_page.dart';
-import 'Widget/notification_screen.dart';
+import 'view/notification/notification_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +34,6 @@ class MyApp extends StatelessWidget {
         '/welcome': (_) => const WelcomeScreen(),
         '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
-        '/explore': (_) => const ExplorePage(),
         '/notification': (_) => const NotificationPage(),
         '/help': (_) => const HelpScreen(),
       },

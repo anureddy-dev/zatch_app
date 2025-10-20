@@ -12,7 +12,8 @@ class ZatchingDetailsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: Center(child: const Text("Zatching", style: TextStyle(color: Colors.black))),
+        centerTitle: true,
+        title: const Text("Zatching", style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -46,7 +47,7 @@ class ZatchingDetailsScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.lightGreenAccent.shade100,
+        color: Color(0xFFCCF656),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -122,7 +123,7 @@ class ZatchingDetailsScreen extends StatelessWidget {
         _statusBubble(
           icon: CircleAvatar(
             radius: 16,
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFFCCF656),
             child: const Icon(Icons.flash_on, size: 16, color: Colors.white),
           ),
           title: "Zatch Expired",
@@ -291,7 +292,7 @@ class ZatchingDetailsScreen extends StatelessWidget {
               padding: const EdgeInsets.only(top: 12),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.lightGreenAccent.shade100,
+                  backgroundColor:Color(0xFFCCF656),
                   foregroundColor: Colors.black,
                   minimumSize: const Size.fromHeight(45),
                   shape: RoundedRectangleBorder(
@@ -314,7 +315,7 @@ class ZatchingDetailsScreen extends StatelessWidget {
               padding: const EdgeInsets.only(top: 8),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.lightGreenAccent.shade100,
+                  backgroundColor: Color(0xFFCCF656),
                   foregroundColor: Colors.black,
                   minimumSize: const Size.fromHeight(45),
                   shape: RoundedRectangleBorder(
@@ -334,13 +335,16 @@ class ZatchingDetailsScreen extends StatelessWidget {
   Widget _bottomInfo() {
     return Container(
       padding: const EdgeInsets.all(12),
-      child: Row(
-        children: const [
-          Icon(Icons.info, size: 18, color: Colors.green),
-          SizedBox(width: 6),
-          Text("Zatches will expire in 2 business days",
-              style: TextStyle(fontSize: 12, color: Colors.black87)),
-        ],
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.info, size: 18, color: Color(0xFFCCF656)),
+            SizedBox(width: 6),
+            Text("Zatches will expire in 2 business days",
+                style: TextStyle(fontSize: 12, color: Colors.black87)),
+          ],
+        ),
       ),
     );
   }

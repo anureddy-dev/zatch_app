@@ -31,21 +31,11 @@ class LiveStreamController extends ChangeNotifier {
   void toggleLike(BuildContext context) {
     isLiked = !isLiked;
     notifyListeners();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(isLiked ? "You liked this stream ❤️" : "Like removed"),
-      ),
-    );
   }
 
   void toggleSave(BuildContext context) {
     isSaved = !isSaved;
     notifyListeners();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(isSaved ? "Saved to your list ✅" : "Removed from saved ❌"),
-      ),
-    );
   }
 
   void share(BuildContext context) {
@@ -58,23 +48,14 @@ class LiveStreamController extends ChangeNotifier {
       context,
       MaterialPageRoute(builder: (_) => CartScreen()),
     );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Added to cart 🛒")),
-    );
   }
 
   void buyNow(BuildContext context, Product? product) {
     if (product == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Buy clicked 🛍️")),
-    );
   }
 
   void zatchNow(BuildContext context, Product? product) {
     if (product == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Zatch clicked ⚡")),
-    );
   }
 
   void openProfile(BuildContext context) {

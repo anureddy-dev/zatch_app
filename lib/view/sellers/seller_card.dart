@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/follower_model.dart';
-import 'package:zatch_app/model/user_model.dart'; // Adjust this import path if needed
+import 'package:zatch_app/model/user_model.dart';
 
 /// A reusable card to display a single seller, designed for a grid layout.
 class SellerCard extends StatelessWidget {

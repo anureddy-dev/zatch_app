@@ -577,21 +577,25 @@ class ApiService {
   /// TRENDING BITS
   Future<List<TrendingBit>> fetchTrendingBits() async {
     try {
-      final response = await _dio.get("/bits/trending");
-      final data = _decodeResponse(response.data);
+      final response = await _dio.get("/bits/trending"); // Replace with your full URL if needed
+      final Map<String, dynamic> data = response.data;
 
-      if (data is Map<String, dynamic> && data.containsKey('trendingBits')) {
-        final List bitsJson = data['trendingBits'] ?? [];
+      if (data.containsKey('bits') && data['bits'] is List) {
+        final List bitsJson = data['bits'];
         return bitsJson.map((json) => TrendingBit.fromJson(json)).toList();
       } else {
-        throw Exception('Unexpected data format for trending bits.');
+        throw Exception('API response is missing the "bits" list.');
       }
+
     } on DioException catch (e) {
-      throw Exception(_handleError(e));
+      debugPrint("DioException fetching trending bits: ${e.response?.data}");
+      throw Exception("Failed to fetch trending bits due to a network error.");
     } catch (e) {
+      debugPrint("Unexpected error fetching trending bits: $e");
       throw Exception("Failed to fetch trending bits: $e");
     }
   }
+
 
   /// Get the user's search history
   Future<SearchHistoryResponse> getUserSearchHistory() async {

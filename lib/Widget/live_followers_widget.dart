@@ -30,7 +30,6 @@ class _LiveFollowersWidgetState extends State<LiveFollowersWidget> {
     _loadLiveUsers();
   }
 
-  // Use a finally block for cleaner state management
   Future<void> _loadLiveUsers() async {
     if (!mounted) return;
     setState(() {
@@ -98,7 +97,7 @@ class _LiveFollowersWidgetState extends State<LiveFollowersWidget> {
                 ),
               ),
               // --- CHANGE #1: Only show "See All" if there are more than 3 items ---
-              if (_liveSessions.length > 3)
+              if (_liveSessions.length > 1)
                 GestureDetector(
                   onTap: () {
                     Navigator.push(
@@ -125,15 +124,13 @@ class _LiveFollowersWidgetState extends State<LiveFollowersWidget> {
           height: cardHeight,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            // --- CHANGE #2: Limit the item count to a maximum of 3 ---
-            itemCount: _liveSessions.length > 3 ? 3 : _liveSessions.length,
+            itemCount: _liveSessions.length > 5 ? 5 : _liveSessions.length,
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             itemBuilder: (context, index) {
               final liveSession = _liveSessions[index];
-
               return Padding(
                 padding: EdgeInsets.only(
-                    right: (index == _liveSessions.length - 1 || index == 2) ? 0 : 12),
+                    right: (index == _liveSessions.length - 1 || index == 4) ? 0 : 12),
                 child: LiveSessionCard(
                   liveSession: liveSession,
                   width: cardWidth,

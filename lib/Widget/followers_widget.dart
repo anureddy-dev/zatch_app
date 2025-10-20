@@ -60,16 +60,6 @@ class _FollowersWidgetState extends State<FollowersWidget> {
       }
     } catch (e) {
       if (mounted) {
-       /* Flushbar(
-          title: "Error",
-          message: "Error toggling follow: $e",
-          duration: const Duration(seconds: 3),
-          backgroundColor: Colors.red,
-          margin: const EdgeInsets.all(8),
-          borderRadius: BorderRadius.circular(8),
-          icon: const Icon(Icons.error_outline, size: 28.0, color: Colors.white),
-          flushbarPosition: FlushbarPosition.TOP,
-        ).show(context);*/
       }
     } finally {
       if (mounted) {
@@ -163,8 +153,7 @@ class _FollowersWidgetState extends State<FollowersWidget> {
       height: 190,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        // MODIFIED: Show a maximum of 4 items in the preview list
-        itemCount: _controller.followers.length > 4 ? 4 : _controller.followers.length,
+        itemCount: _controller.followers.length > 5 ? 5 : _controller.followers.length,
         separatorBuilder: (_, __) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           final user = _controller.followers[index];

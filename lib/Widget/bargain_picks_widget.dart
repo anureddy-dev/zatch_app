@@ -54,7 +54,6 @@ class _BargainPicksWidgetState extends State<BargainPicksWidget> {
                 ),
                 GestureDetector(
                   onTap: () {
-                    // --- 2. MODIFIED: Navigate to the new grid screen ---
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -78,13 +77,11 @@ class _BargainPicksWidgetState extends State<BargainPicksWidget> {
             ),
           ),
           const SizedBox(height: 16),
-
-          /// Horizontal list of bargain picks
           SizedBox(
             height: totalCardHeight,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: _controller.picks.length > 3 ? 3 : _controller.picks.length,
+              itemCount: _controller.picks.length > 5 ? 5 : _controller.picks.length,
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               itemBuilder: (context, index) {
                 final pick = _controller.picks[index];

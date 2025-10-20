@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:zatch_app/view/cart_screen.dart';
 import 'package:zatch_app/view/coupon_apply_screen.dart';
-import 'package:zatch_app/view/order_place_screen.dart';
+import 'package:zatch_app/view/order_view/order_place_screen.dart';
 import 'package:zatch_app/view/setting_view/add_new_address_screen.dart';
 import 'package:zatch_app/view/setting_view/payment_method_screen.dart';
 

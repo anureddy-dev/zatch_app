@@ -1,4 +1,4 @@
-import 'dart:ffi';
+// Removed unnecessary import 'dart:ffi';
 
 class LiveSessionsResponse {
   final bool success;
@@ -13,7 +13,7 @@ class LiveSessionsResponse {
     return LiveSessionsResponse(
       success: json['success'] ?? false,
       sessions: (json['sessions'] as List<dynamic>?)
-          ?.map((e) => Session.fromJson(e))
+          ?.map((e) => Session.fromJson(e as Map<String, dynamic>)) // Added type cast
           .toList() ??
           [],
     );
@@ -32,7 +32,7 @@ class Session {
   final String title;
   final String? description;
   final String status;
-  final int viewersCount;
+   int viewersCount;
   final String? startTime; // for live/upcoming
   final String? scheduledStartTime; // for scheduled
   final String? channelName;
@@ -60,7 +60,9 @@ class Session {
       startTime: json['startTime'],
       scheduledStartTime: json['scheduledStartTime'],
       channelName: json['channelName'],
-      host: json['hostId'] != null ? Host.fromJson(json['hostId']) : null,
+      host: json['hostId'] != null && json['hostId'] is Map<String, dynamic>
+          ? Host.fromJson(json['hostId'])
+          : null,
     );
   }
 
@@ -105,8 +107,8 @@ class Host {
     return {
       '_id': id,
       'username': username,
+      'profilePicUrl': profilePicUrl,
       'rating': rating,
     };
   }
 }
-
