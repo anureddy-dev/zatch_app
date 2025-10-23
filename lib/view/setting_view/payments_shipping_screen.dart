@@ -1,10 +1,14 @@
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:zatch_app/model/coupon_model.dart';
+import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/view/cart_screen.dart';
 import 'package:zatch_app/view/coupon_apply_screen.dart';
 import 'package:zatch_app/view/order_view/order_place_screen.dart';
+import 'package:zatch_app/view/setting_view/account_details_screen.dart';
 import 'package:zatch_app/view/setting_view/add_new_address_screen.dart';
 import 'package:zatch_app/view/setting_view/payment_method_screen.dart';
+
 
 class CheckoutOrPaymentsScreen extends StatefulWidget {
   final bool isCheckout;
@@ -28,279 +32,552 @@ class CheckoutOrPaymentsScreen extends StatefulWidget {
 }
 
 class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
-  int selectedAddress = 0;
+  int selectedAddressIndex = 0;
   int selectedPayment = 0;
+  UserProfileResponse? userProfile;
+
+  // Using stateful list for dynamic removal
+  final List<Address> _addresses = [
+    Address(
+      id: '1',
+      title: "Home",
+      fullAddress: "A-403 Mantri Celestia, Financial District, Hyderabad",
+      phone: "+91 98765 43210",
+      icon: Icons.home_outlined,
+    ),
+    Address(
+      id: '2',
+      title: "Office",
+      fullAddress: "Waverock Building, Nanakramguda, Hyderabad",
+      phone: "+91 99887 76655",
+      icon: Icons.apartment_outlined,
+    ),
+    Address(
+      id: '3',
+      title: "Other",
+      fullAddress: "Lorem ipsum street, Madhapur, Hyderabad",
+      phone: "+91 88776 65544",
+      icon: Icons.location_on_outlined,
+    ),
+  ];
+
+  Coupon? appliedCoupon;
+  double discountAmount = 0.0;
+  late double finalSubTotal;
+
+  @override
+  void initState() {
+    super.initState();
+    finalSubTotal = widget.subTotalPrice ?? 0.0;
+    // Pre-select office to match figma
+    int officeIndex = _addresses.indexWhere((a) => a.title == "Office");
+    if (officeIndex != -1) {
+      selectedAddressIndex = officeIndex;
+    }
+  }
+
+  /// Applies the selected coupon and updates the totals.
+  void _applyCoupon(Coupon coupon) {
+    setState(() {
+      appliedCoupon = coupon;
+      // Calculate discount based on the items' total price before shipping
+      double calculatedDiscount =
+          (widget.itemsTotalPrice ?? 0.0) * (coupon.discountPercentage / 100);
+      discountAmount = calculatedDiscount;
+      // Recalculate the final subtotal
+      finalSubTotal = (widget.subTotalPrice ?? 0.0) - discountAmount;
+    });
+  }
+
+  /// Removes the applied coupon and resets the discount.
+  void _removeCoupon() {
+    setState(() {
+      appliedCoupon = null;
+      discountAmount = 0.0;
+      // Restore the original subtotal
+      finalSubTotal = widget.subTotalPrice ?? 0.0;
+    });
+  }
+
+  /// Navigates to the Coupon screen and handles the result.
+  void _navigateToCouponScreen() async {
+    // The result can be a Coupon object or null
+    final result = await Navigator.push<Coupon>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CouponApplyScreen(),
+      ),
+    );
+
+    // If the user selected a coupon and tapped "Apply"
+    if (result != null) {
+      _applyCoupon(result);
+    }
+  }
+
+
+  // --- Dialog for removing item ---
+  Future<void> _showRemoveItemDialog(CartItem item) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Remove Item?'),
+          content: const Text(
+            'Are you sure you want to remove this item from your cart?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Remove'),
+              onPressed: () {
+                setState(() {
+                  widget.selectedItems?.remove(item);
+                  // Optionally, recalculate totals here if needed
+                });
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.isCheckout ? "Checkout" : "Payments and Shipping"),
-        centerTitle: true,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+        centerTitle: true,
+        title: const Text(
+          'Checkout',
+          style: TextStyle(
+            color: Color(0xFF121111),
+            fontSize: 16,
+            fontFamily: 'Encode Sans',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        leading: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: InkWell(
+            onTap: () => Navigator.of(context).pop(),
+            borderRadius: BorderRadius.circular(32),
+            child: const Icon(Icons.arrow_back, color: Colors.black),
+          ),
         ),
       ),
       body: Column(
         children: [
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                /// 🛒 Show Cart Items only in Checkout (NOW DYNAMIC)
-                if (widget.isCheckout) ...[
-                  // Use a ListView.builder for dynamic items
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: widget.selectedItems?.length ?? 0,
-                    itemBuilder: (context, index) {
-                      // --- FIX IS HERE ---
-                      final item = widget.selectedItems?[index];
-                      if (item == null) {
-                        // Return an empty widget if item is null
-                        return const SizedBox.shrink();
-                      }
-                      return _cartItem(item);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _shippingInfo(
-                    itemCount: widget.selectedItems?.length ?? 0,
-                    itemsTotal: widget.itemsTotalPrice ?? 0.0,
-                    shipping: widget.shippingFee ?? 0.0,
-                    subTotal: widget.subTotalPrice ?? 0.0,
-                  ),
-                  const SizedBox(height: 16),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.isCheckout) ...[
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // --- List of Cart Items ---
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: widget.selectedItems?.length ?? 0,
+                          itemBuilder: (context, index) {
+                            final item = widget.selectedItems![index];
+                            return _cartItem(item);
+                          },
+                          separatorBuilder:
+                              (context, index) => const SizedBox(height: 22),
+                        ),
+                        const SizedBox(height: 22),
 
-                  /// 📧 Contact Details
-                  const Text(
-                    "Contact Details",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: "Enter Email Address",
-                      filled: true,
-                      fillColor: Colors.grey.shade200,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                        // --- Shipping Information ---
+                        _shippingInfo(
+                          itemCount: widget.selectedItems?.length ?? 0,
+                          itemsTotal: widget.itemsTotalPrice ?? 0.0,
+                          shipping: widget.shippingFee ?? 0.0,
+                          discount: discountAmount,
+                          subTotal: finalSubTotal,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Contact Details',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 14,
+                        fontFamily: 'Encode Sans',
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                /// 📍 Addresses
-                const Text(
-                  "Select Location",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                _addressTile(
-                  0,
-                  "Home",
-                  "A-403 Mantri Celestia, Financial District, Hyderabad",
-                  Icons.home,
-                ),
-                _addressTile(
-                  1,
-                  "Office",
-                  "A-403 Mantri Celestia, Financial District, Hyderabad",
-                  Icons.apartment,
-                ),
-                _addressTile(
-                  2,
-                  "Other",
-                  "Lorem ipsum street, Hyderabad",
-                  Icons.location_on,
-                ),
-                const SizedBox(height: 8),
-                _addNewButton("Add New Address", () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AddNewAddressScreen(),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 18.0),
+                      child: const Text(
+                        'Email',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                          fontFamily: 'Encode Sans',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  );
-                }),
+                    const SizedBox(height: 10),
+                    _contactDetailsField(
+                      initialValue: "anureddy.kv@example.com",
+                      onEdit: () {
 
-                const SizedBox(height: 16),
-
-                /// 💳 Payment
-                const Text(
-                  "Choose Payment Method",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                _paymentTile(0, "VISA", "2143"),
-                const SizedBox(height: 8),
-                _addNewButton("Add New Payment", () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          PaymentMethodScreen(data: PaymentData.getDummy()),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AccountDetailsScreen(userProfile: userProfile),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                }),
+                    const SizedBox(height: 36),
+                  ],
 
-                /// 🎟 Coupon only in Checkout
-                if (widget.isCheckout) ...[
-                  const SizedBox(height: 16),
                   const Text(
-                    "Coupon Code",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    'Select Location',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 14,
+                      fontFamily: 'Encode Sans',
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  _couponCodeButton(() {
+                  const SizedBox(height: 16),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _addresses.length,
+                    itemBuilder: (context, index) {
+                      final address = _addresses[index];
+                      return _addressTile(
+                        address: address,
+                        isSelected: selectedAddressIndex == index,
+                        onTap:
+                            () => setState(() => selectedAddressIndex = index),
+                        onEdit: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => AddNewAddressScreen(
+                                addressToEdit: address,
+                              ),
+                            ),
+                          );
+                        },
+                        onRemove: () {
+                          setState(() {
+                            _addresses.removeAt(index);
+                            if (selectedAddressIndex >= _addresses.length &&
+                                _addresses.isNotEmpty) {
+                              selectedAddressIndex = _addresses.length - 1;
+                            }
+                          });
+                        },
+                      );
+                    },
+                    separatorBuilder: (c, i) => const SizedBox(height: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  _addNewButton("Add New Address", () async {
+                    final newAddress = await Navigator.push<Address>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AddNewAddressScreen(),
+                      ),
+                    );
+                    if (newAddress != null) {
+                      setState(() {
+                        _addresses.add(newAddress);
+                      });
+                    }
+                  }),
+
+                  const SizedBox(height: 36),
+
+                  const Text(
+                    'Choose Payment Method',
+                    style: TextStyle(
+                      color: Color(0xFF121111),
+                      fontSize: 14,
+                      fontFamily: 'Encode Sans',
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _paymentTile(0, "VISA", "2143"),
+                  const SizedBox(height: 16),
+                  _addNewButton("Add New Payment", () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => CouponApplyScreen()),
+                      MaterialPageRoute(
+                        builder:
+                            (_) => PaymentMethodScreen(
+                              data: PaymentData.getDummy(),
+                            ),
+                      ),
                     );
-                    debugPrint("Coupon Apply tapped");
                   }),
+                  if (widget.isCheckout) ...[
+                    const SizedBox(height: 36),
+                    const Text(
+                      'Coupon Code',
+                      style: TextStyle(
+                        color: Color(0xFF121111),
+                        fontSize: 14,
+                        fontFamily: 'Encode Sans',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildCouponSection(),
+                  ],
+                  const SizedBox(height: 20), // Bottom padding
                 ],
-              ],
+              ),
             ),
           ),
-
-          /// 🟩 Pay button
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>  OrderPlacedScreen(),
+          // --- PAY BUTTON ---
+          if (widget.isCheckout)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => OrderPlacedScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: const Color(0xFFCCF656),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                backgroundColor: const Color(0xFFDAFF00),
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Pay',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Encode Sans',
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              child: const Text("Pay", style: TextStyle(fontSize: 18)),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _couponCodeButton(VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(30),
-          color: Colors.white,
+  // --- WIDGETS ---
+
+  Widget _buildCouponSection() {
+    bool isApplied = appliedCoupon != null;
+
+    if (isApplied) {
+      // --- UI WHEN A COUPON IS APPLIED ---
+      return Container(
+        height: 67,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: ShapeDecoration(
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(width: 1.5, color: Colors.green),
+            borderRadius: BorderRadius.circular(20),
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
-              "Apply Coupon Code",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "'${appliedCoupon!.code}' Applied!",
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontSize: 14,
+                    fontFamily: 'Encode Sans',
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "You saved ${discountAmount.toStringAsFixed(2)} ₹",
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 12,
+                    fontFamily: 'Encode Sans',
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            TextButton(
+              onPressed: _removeCoupon,
+              child: const Text(
+                "Remove",
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Color(0xFF8B0000),
-            ), // dark red arrow
           ],
         ),
-      ),
-    );
+      );
+    } else {
+      // --- UI TO APPLY A NEW COUPON ---
+      return InkWell(
+        onTap: _navigateToCouponScreen,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 67,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: ShapeDecoration(
+            shape: RoundedRectangleBorder(
+              side: const BorderSide(width: 1, color: Color(0xFFD3D3D3)),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'Apply Coupon Code',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 12,
+                  fontFamily: 'Encode Sans',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Color(0xFF8B0000),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
-  // Updated to take a CartItem object
+
   Widget _cartItem(CartItem item) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
-      child: ListTile(
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
           child: Image.network(
-            "https://picsum.photos/seed/${item.name}/60", // Use item name as seed for unique image
-            width: 50,
-            height: 50,
+            item.imageUrl,
+            width: 57,
+            height: 57,
             fit: BoxFit.cover,
           ),
         ),
-        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(item.description),
-        trailing: Text(
-          'Qty: ${item.quantity}',
-          style: const TextStyle(fontWeight: FontWeight.w500),
+        const SizedBox(width: 15),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.name,
+                style: const TextStyle(
+                  color: Color(0xFF121111),
+                  fontSize: 14,
+                  fontFamily: 'Encode Sans',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.description,
+                style: const TextStyle(
+                  color: Color(0xFF787676),
+                  fontSize: 10,
+                  fontFamily: 'Encode Sans',
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${item.price.toStringAsFixed(2)} ₹',
+                style: const TextStyle(
+                  color: Color(0xFF292526),
+                  fontSize: 14,
+                  fontFamily: 'Encode Sans',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
-
-  // Updated to take dynamic data
-  Widget _shippingInfo({
-    required int itemCount,
-    required double itemsTotal,
-    required double shipping,
-    required double subTotal,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Shipping Information",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text("Total ($itemCount items)"),
-            Text(
-              "${itemsTotal.toStringAsFixed(2)} ₹",
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text("Shipping Fee"),
-            Text("${shipping.toStringAsFixed(2)} ₹")
-          ],
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [Text("Discount"), Text("0.00 ₹")],
-        ),
-        const Divider(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text("Sub Total", style: TextStyle(fontWeight: FontWeight.bold)),
-            Text(
-              "${subTotal.toStringAsFixed(2)} ₹",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            const Icon(Icons.more_horiz, size: 24, color: Color(0xFF292526)),
+            const SizedBox(height: 9),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _quantityButton(
+                  icon: Icons.remove,
+                  onPressed: () {
+                    if (item.quantity > 1) {
+                      setState(() => item.quantity--);
+                    } else {
+                      _showRemoveItemDialog(item);
+                    }
+                  },
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 7,
+                  child: Text(
+                    '${item.quantity}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF292526),
+                      fontSize: 14,
+                      fontFamily: 'Encode Sans',
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _quantityButton(
+                  icon: Icons.add,
+                  onPressed: () => setState(() => item.quantity++),
+                ),
+              ],
             ),
           ],
         ),
@@ -308,18 +585,275 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
     );
   }
 
-  Widget _addressTile(int index, String title, String subtitle, IconData icon) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
-      child: RadioListTile(
-        value: index,
-        groupValue: selectedAddress,
-        onChanged: (val) => setState(() => selectedAddress = val!),
-        activeColor: Colors.black,
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
-        secondary: Icon(icon),
+  Widget _quantityButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(32),
+      child: Container(
+        width: 24,
+        height: 24,
+        decoration: ShapeDecoration(
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(width: 1, color: Color(0xFFDFDEDE)),
+            borderRadius: BorderRadius.circular(32),
+          ),
+        ),
+        child: Icon(icon, size: 16),
+      ),
+    );
+  }
+
+  Widget _shippingInfo({
+    required int itemCount,
+    required double itemsTotal,
+    required double shipping,
+    required double discount,
+    required double subTotal,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Shipping Information',
+          style: TextStyle(
+            color: Color(0xFF121111),
+            fontSize: 14,
+            fontFamily: 'Encode Sans',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildPriceRow(
+          'Total ($itemCount items)',
+          '${itemsTotal.toStringAsFixed(2)} ₹',
+        ),
+        const SizedBox(height: 12),
+        _buildPriceRow('Shipping Fee', '${shipping.toStringAsFixed(2)} ₹'),
+        const SizedBox(height: 12),
+        _buildPriceRow(
+          'Discount',
+          '-${discount.toStringAsFixed(2)} ₹',
+          valueColor: Colors.green,
+        ),
+        const SizedBox(height: 12),
+        const Divider(color: Color(0xFFCBCBCB), thickness: 1),
+        const SizedBox(height: 12),
+        _buildPriceRow(
+          'Sub Total',
+          '${subTotal.toStringAsFixed(2)} ₹',
+          isBold: true,
+        ),
+        const Divider(color: Color(0xFFCBCBCB), thickness: 1),
+      ],
+    );
+  }
+
+  Widget _buildPriceRow(
+      String label,
+      String value, {
+        Color? valueColor,
+        bool isBold = false,
+      }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: const Color(0xFF292526),
+            fontSize: 14,
+            fontFamily: 'Encode Sans',
+            fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+        Text(
+          value,
+          textAlign: TextAlign.right,
+          style: TextStyle(
+            color: valueColor ?? const Color(0xFF121111),
+            fontSize: isBold ? 16 : 14,
+            fontFamily: 'Encode Sans',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _contactDetailsField({
+    required String initialValue,
+    required VoidCallback onEdit,
+  }) {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.only(left: 24, right: 15),
+      decoration: ShapeDecoration(
+        color: const Color(0xFFF2F4F5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(70)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            initialValue,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF616161),
+              fontSize: 16,
+              fontFamily: 'Encode Sans',
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          TextButton(
+            onPressed: onEdit,
+            child: const Text(
+              "Edit",
+              style: TextStyle(color: Color(0xFF8B0000)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _addressTile({
+    required Address address,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required VoidCallback onEdit,
+    required VoidCallback onRemove,
+  }) {
+    return Dismissible(
+      key: Key(address.id),
+      direction:
+      DismissDirection.horizontal, // Allow swiping in both directions
+
+      background: Container(
+        decoration: BoxDecoration(
+          color: Color(0xFFCCF656),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: const Icon(Icons.edit, color: Colors.white),
+      ),
+
+      secondaryBackground: Container(
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          // Swiped Right to Edit
+          onEdit();
+          return false; // Prevent the item from being dismissed
+        } else {
+          return await showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text("Confirm Delete"),
+                content: const Text(
+                  "Are you sure you want to remove this address?",
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text("CANCEL"),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(true);
+                      onRemove(); // Call remove callback if confirmed
+                    },
+                    child: const Text(
+                      "DELETE",
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+      },
+
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 85,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: ShapeDecoration(
+            shape: RoundedRectangleBorder(
+              side: BorderSide(
+                width: isSelected ? 2 : 1,
+                color:
+                isSelected
+                    ? const Color(0xFF2C2C2C)
+                    : const Color(0xFFD3D3D3),
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 65,
+                height: 66,
+                decoration: ShapeDecoration(
+                  color: const Color(0xFFF2F2F2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                child: Icon(address.icon, size: 30, color: Colors.black54),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      address.title,
+                      style: const TextStyle(
+                        color: Color(0xFF2C2C2C),
+                        fontSize: 12,
+                        fontFamily: 'Encode Sans',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${address.fullAddress}\n${address.phone}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF8D8D8D),
+                        fontSize: 12,
+                        fontFamily: 'Encode Sans',
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _customRadioButton(isSelected),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -336,6 +870,35 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
         title: Text("$type **** **** $digits"),
         secondary: const Icon(Icons.credit_card, color: Colors.blue),
       ),
+    );
+  }
+
+  Widget _customRadioButton(bool isSelected) {
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: ShapeDecoration(
+        shape: OvalBorder(
+          side: BorderSide(
+            width: isSelected ? 2 : 1,
+            color:
+            isSelected ? const Color(0xFF2C2C2C) : const Color(0xFFD3D3D3),
+          ),
+        ),
+      ),
+      child:
+      isSelected
+          ? Center(
+        child: Container(
+          width: 10,
+          height: 10,
+          decoration: const ShapeDecoration(
+            color: Color(0xFF2C2C2C),
+            shape: OvalBorder(),
+          ),
+        ),
+      )
+          : null,
     );
   }
 

@@ -220,16 +220,39 @@ class ApiService {
     }
   }
 
-  /// USER PROFILE
   Future<UserProfileResponse> getUserProfile() async {
     try {
       final response = await _dio.get("/user/profile");
+
+      // Print the raw response data from API
+      print("🔹 Raw API Response: ${response.data}");
+
       final data = _decodeResponse(response.data);
-      return UserProfileResponse.fromJson(data);
+
+      // Print the decoded JSON (after your _decodeResponse helper)
+      print("🔹 Decoded Data: $data");
+
+      // Create model
+      final userProfile = UserProfileResponse.fromJson(data);
+
+      // Print the parsed object values
+      print("✅ Parsed UserProfileResponse:");
+      print("   Username: ${userProfile.user.username}");
+      print("   Email: ${userProfile.user.email}");
+      print("   Followers: ${userProfile.user.followerCount}");
+      print("   Profile Pic: ${userProfile.user.profilePic.url}");
+
+      return userProfile;
     } on DioException catch (e) {
+      print("❌ DioException: ${e.response?.data}");
       throw Exception(_handleError(e));
+    } catch (e, st) {
+      print("❌ Unexpected Error: $e");
+      print(st);
+      rethrow;
     }
   }
+
 
   /// CATEGORIES
   Future<List<Category>> getCategories() async {
@@ -574,19 +597,18 @@ class ApiService {
     }
   }
 
-  /// TRENDING BITS
   Future<List<TrendingBit>> fetchTrendingBits() async {
     try {
-      final response = await _dio.get("/bits/trending"); // Replace with your full URL if needed
+      final response = await _dio.get("/bits/trending");
       final Map<String, dynamic> data = response.data;
 
-      if (data.containsKey('bits') && data['bits'] is List) {
-        final List bitsJson = data['bits'];
+      // ✅ CORRECTED: The key from your backend is "trendingBits"
+      if (data.containsKey('trendingBits') && data['trendingBits'] is List) {
+        final List bitsJson = data['trendingBits'];
         return bitsJson.map((json) => TrendingBit.fromJson(json)).toList();
       } else {
-        throw Exception('API response is missing the "bits" list.');
+        throw Exception('API response is missing the "trendingBits" list.');
       }
-
     } on DioException catch (e) {
       debugPrint("DioException fetching trending bits: ${e.response?.data}");
       throw Exception("Failed to fetch trending bits due to a network error.");
@@ -595,6 +617,7 @@ class ApiService {
       throw Exception("Failed to fetch trending bits: $e");
     }
   }
+
 
 
   /// Get the user's search history

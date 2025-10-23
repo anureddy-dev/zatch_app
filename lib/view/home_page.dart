@@ -3,6 +3,7 @@ import 'package:zatch_app/Widget/category_tabs_widget.dart';
 import 'package:zatch_app/model/categories_response.dart';
 import 'package:zatch_app/model/login_response.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
+import 'package:zatch_app/sellersscreens/SellHomeScreen.dart';
 import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/search_view/search_screen.dart';
 import 'package:zatch_app/view/setting_view/account_setting_screen.dart';
@@ -173,28 +174,37 @@ class _HomePageState extends State<HomePage> {
       isLoading
           ? const Center(child: CircularProgressIndicator())
           : SearchScreen(key: UniqueKey(), userProfile: userProfile),
-      const Center(child: Text('Seller', style: TextStyle(fontSize: 24))),
+      SellHomeScreen(),
       AccountSettingsScreen(),
     ];
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      // --- MODIFIED: Use the new 'pages' list in the IndexedStack ---
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages, // <-- MODIFIED
+    return  WillPopScope(
+      onWillPop: () async {
+        if (_selectedIndex != 0) {
+          setState(() {
+            _selectedIndex = 0;
+          });
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: pages,
+        ),
+        bottomNavigationBar: CustomBottomNavBar(
+          selectedIndex: _selectedIndex,
+          onItemTapped: _onItemTapped,
+          userProfile: userProfile,
+        ),
+        floatingActionButton: FloatingZButton(
+          onPressed: () {
+          },
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),
-      bottomNavigationBar: CustomBottomNavBar(
-        selectedIndex: _selectedIndex,
-        onItemTapped: _onItemTapped,
-        userProfile: userProfile,
-      ),
-      floatingActionButton: FloatingZButton(
-        onPressed: () {
-          // Add your action for the floating button, e.g., create a new post
-        },
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 }

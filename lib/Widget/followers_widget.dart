@@ -105,7 +105,7 @@ class _FollowersWidgetState extends State<FollowersWidget> {
                   child: const Text(
                     'See All',
                     style: TextStyle(
-                      color: Colors.blueAccent,
+                      color: Colors.black,
                       fontWeight: FontWeight.w500,
                     ),
                   ),

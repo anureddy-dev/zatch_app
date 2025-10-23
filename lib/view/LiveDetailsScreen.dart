@@ -4,6 +4,7 @@ import 'package:zatch_app/controller/live_stream_controller.dart';
 import 'package:zatch_app/model/carts_model.dart';
 import 'package:zatch_app/model/product_response.dart';
 import 'package:zatch_app/services/api_service.dart';
+import 'package:zatch_app/view/cart_screen.dart';
 import 'package:zatch_app/view/product_view/product_detail_screen.dart';
 import 'package:zatch_app/view/profile/profile_screen.dart';
 import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
@@ -1146,11 +1147,29 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
                     onPressed: () {
                       Navigator.pop(context);
                       if (selectedOption == "buy") {
-                        // Navigate to Checkout screen
+                        final itemToCheckout = CartItem(
+                          name: product.name,
+                          description: product.category?.name ?? "Live Stream Item", // Use category name or a default
+                          price: product.price,
+                          quantity: quantity, // The quantity selected in the bottom sheet
+                          imageUrl: product.images.isNotEmpty
+                              ? product.images.first.url
+                              : "https://placehold.co/100x100?text=P",
+
+                        );
+
+                        // 2. Calculate the total prices.
+                        double itemsTotal = itemToCheckout.price * itemToCheckout.quantity;
+                        double shippingFee = 50.0; // Example shipping fee, or calculate as needed.
+                        double subTotal = itemsTotal + shippingFee;
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => CheckoutOrPaymentsScreen(isCheckout: true,),
+                            builder: (_) => CheckoutOrPaymentsScreen(isCheckout: true,
+                            selectedItems: [itemToCheckout],
+                              itemsTotalPrice: itemsTotal,
+                              shippingFee: shippingFee,
+                              subTotalPrice: subTotal,),
                           ),
                         );
                       } else {

@@ -8,6 +8,7 @@ import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
 import 'package:zatch_app/view/setting_view/profile_screen.dart';
 import 'account_details_screen.dart';
 import 'package:zatch_app/view/policy_screen.dart';
+import 'dart:convert'; // ✅ for jsonEncode()
 
 class AccountSettingsScreen extends StatefulWidget {
   final VoidCallback? onOpenAccountDetails;
@@ -23,6 +24,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   UserProfileResponse? userProfile;
   bool isLoading = true;
   String? error;
+  String? rawResponseText; // ✅ to display raw API data
 
   @override
   void initState() {
@@ -36,16 +38,26 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     setState(() {
       isLoading = true;
       error = null;
+      rawResponseText = null;
     });
 
     try {
       final profileModel = await _apiService.getUserProfile();
-      print("Profile Response: $profileModel");
+
+      // ✅ Capture the response as a readable JSON string
+      final jsonResponse = const JsonEncoder.withIndent('  ')
+          .convert(profileModel.toJson());
+
       setState(() {
         userProfile = profileModel;
+        rawResponseText = jsonResponse; // store it for screen display
         isLoading = false;
       });
+
+      print("✅ Profile Response (JSON): $jsonResponse");
     } catch (e, st) {
+      print("❌ Error fetching user profile: $e");
+      print(st);
       setState(() {
         error = e.toString();
         isLoading = false;
@@ -58,145 +70,163 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F2),
       appBar: _appBar("Account Settings"),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : error != null
-              ? Center(child: Text("Error: $error"))
-              : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileScreen(userProfile),
-                        ),
-                      );
-                    },
-                    child: _profileCard(userProfile),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 6,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _settingsTile(
-                          Icons.account_circle,
-                          "Account Details",
-                          () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => AccountDetailsScreen(
-                                      userProfile: userProfile,
-                                    ),
-                              ),
-                            );
-                          },
-                        ),
-                        _settingsTile(Icons.shopping_cart, "Your Orders", () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => OrdersScreen()),
-                          );
-                        }),
-                        _settingsTile(
-                          Icons.local_shipping,
-                          "Payments and Shipping",
-                          () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CheckoutOrPaymentsScreen(isCheckout: false,),
-                              ),
-                            );
-                          },
-                        ),
-                        _settingsTile(Icons.dark_mode, "Dark Mode", () {}),
-                        _settingsTile(
-                          Icons.tune,
-                          "Change Preferences in shopping",
-                          () {},
-                        ),
-                        _settingsTile(Icons.help_outline, "Help", () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const HelpScreen(),
-                            ),
-                          );
-                        }),
-                        _settingsTile(
-                          Icons.info_outline,
-                          "Understand Zatch",
-                          () {},
-                        ),
-                        _settingsTile(Icons.privacy_tip, "Privacy Policy", () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => const PolicyScreen(
-                                    title: "Privacy Policy",
-                                  ),
-                            ),
-                          );
-                        }),
-                        _settingsTile(
-                          Icons.description,
-                          "Terms & Conditions",
-                          () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => const PolicyScreen(
-                                      title: "Terms & Conditions",
-                                    ),
-                              ),
-                            );
-                          },
-                        ),
-                        _settingsTile(Icons.logout, "Log out", () async {
-                          setState(() => isLoading = true);
-                          final prefs = PreferenceService();
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+          ? Center(child: Text("Error: $error"))
+          : ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProfileScreen(userProfile),
+                ),
+              );
+            },
+            child: _profileCard(userProfile),
+          ),
 
-                          try {
-                            await _apiService.logoutUser();
-                            await prefs.logoutAll();
+          const SizedBox(height: 16),
 
-                            if (!mounted) return;
-                            Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text("Logout failed: $e")),
-                              );
-                            }
-                          } finally {
-                            if (mounted) setState(() => isLoading = false);
-                          }
-                        }),
-
-                      ],
-                    ),
-                  ),
-                ],
+          // ✅ DEBUG RESPONSE SECTION
+          if (rawResponseText != null) ...[
+            const Text(
+              "🔍 API Response:",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black12,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Text(
+                  rawResponseText!,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ✅ SETTINGS CARD SECTION
+          _settingsContainer(),
+        ],
+      ),
+    );
+  }
+
+  // Reusable settings container
+  Widget _settingsContainer() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _settingsTile(Icons.account_circle, "Account Details", () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AccountDetailsScreen(
+                  userProfile: userProfile,
+                ),
+              ),
+            );
+          }),
+          _settingsTile(Icons.shopping_cart, "Your Orders", () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => OrdersScreen()),
+            );
+          }),
+          _settingsTile(
+            Icons.local_shipping,
+            "Payments and Shipping",
+                () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      CheckoutOrPaymentsScreen(isCheckout: false),
+                ),
+              );
+            },
+          ),
+          _settingsTile(Icons.dark_mode, "Dark Mode", () {}),
+          _settingsTile(Icons.tune, "Change Preferences in shopping", () {}),
+          _settingsTile(Icons.help_outline, "Help", () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const HelpScreen(),
+              ),
+            );
+          }),
+          _settingsTile(Icons.info_outline, "Understand Zatch", () {}),
+          _settingsTile(Icons.privacy_tip, "Privacy Policy", () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const PolicyScreen(title: "Privacy Policy"),
+              ),
+            );
+          }),
+          _settingsTile(Icons.description, "Terms & Conditions", () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                const PolicyScreen(title: "Terms & Conditions"),
+              ),
+            );
+          }),
+          _settingsTile(Icons.logout, "Log out", () async {
+            setState(() => isLoading = true);
+            final prefs = PreferenceService();
+
+            try {
+              await _apiService.logoutUser();
+              await prefs.logoutAll();
+
+              if (!mounted) return;
+              Navigator.pushNamedAndRemoveUntil(
+                  context, '/login', (route) => false);
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Logout failed: $e")),
+                );
+              }
+            } finally {
+              if (mounted) setState(() => isLoading = false);
+            }
+          }),
+        ],
+      ),
     );
   }
 
@@ -218,12 +248,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 
   Widget _profileCard(UserProfileResponse? userProfile) {
-    final name = userProfile?.user.username ?? "Palwendar Kaur";
+    final name = userProfile?.user.username ?? "Unknown User";
     final followers = userProfile?.user.followerCount?.toString() ?? "0";
     final profilePicUrl =
-        (userProfile?.user.profilePic.url.isNotEmpty ?? false)
-            ? userProfile!.user.profilePic.url
-            : "";
+    (userProfile?.user.profilePic.url.isNotEmpty ?? false)
+        ? userProfile!.user.profilePic.url
+        : "";
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -242,7 +272,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         children: [
           CircleAvatar(
             radius: 30,
-            backgroundImage: NetworkImage(profilePicUrl),
+            backgroundImage:
+            profilePicUrl.isNotEmpty ? NetworkImage(profilePicUrl) : null,
+            child: profilePicUrl.isEmpty ? const Icon(Icons.person) : null,
           ),
           const SizedBox(width: 12),
           Column(

@@ -1,56 +1,190 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+
+class Address {
+  String id;
+  String title;
+  String fullAddress;
+  String phone;
+  IconData icon;
+
+  Address({
+    required this.id,
+    required this.title,
+    required this.fullAddress,
+    required this.phone,
+    required this.icon,
+  });
+}
+
 
 class AddNewAddressScreen extends StatefulWidget {
-  const AddNewAddressScreen({super.key});
+  final Address? addressToEdit;
+
+  const AddNewAddressScreen({super.key, this.addressToEdit});
 
   @override
   State<AddNewAddressScreen> createState() => _AddNewAddressScreenState();
 }
 
 class _AddNewAddressScreenState extends State<AddNewAddressScreen> {
-  final TextEditingController address1 = TextEditingController();
-  final TextEditingController address2 = TextEditingController();
-  final TextEditingController pinCode = TextEditingController();
-  final TextEditingController phone = TextEditingController();
-  final TextEditingController latitude = TextEditingController();
-  final TextEditingController longitude = TextEditingController();
-  String? selectedState;
+  final _formKey = GlobalKey<FormState>();
 
-  // List of states for the dropdown
-  final List<String> states = [
-    "Telangana",
-    "AP",
-    "Karnataka",
-    "Tamil Nadu",
-    "Kerala",
+  final TextEditingController labelController = TextEditingController();
+  final TextEditingController address1Controller = TextEditingController();
+  final TextEditingController address2Controller = TextEditingController();
+  final TextEditingController cityController = TextEditingController();
+  final TextEditingController pinCodeController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+
+  String? selectedState;
+  bool _isLocating = false;
+
+  final List<String> indianStates = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
+    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
+    "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
+    "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+    "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
+    "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
   ];
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.addressToEdit != null) {
+      final address = widget.addressToEdit!;
+      labelController.text = address.title;
+      phoneController.text = address.phone.replaceAll('+91 ', '').trim();
+
+      // A more robust way to parse the address string
+      final addressParts = address.fullAddress.split(',').map((s) => s.trim()).toList();
+      if (addressParts.length >= 3) {
+        address1Controller.text = addressParts.length > 0 ? addressParts[0] : '';
+        address2Controller.text = addressParts.length > 1 ? addressParts[1] : '';
+        cityController.text = addressParts.length > 2 ? addressParts[2] : '';
+        if (addressParts.length > 3) {
+          pinCodeController.text = addressParts[3].replaceAll(RegExp(r'[^0-9]'), '');
+        }
+        if (addressParts.length > 4) {
+          final statePart = addressParts[4];
+          if (indianStates.contains(statePart)) {
+            selectedState = statePart;
+          }
+        }
+      } else {
+        address1Controller.text = address.fullAddress;
+      }
+    }
+  }
+
+  @override
   void dispose() {
-    address1.dispose();
-    address2.dispose();
-    pinCode.dispose();
-    phone.dispose();
-    latitude.dispose();
-    longitude.dispose();
+    labelController.dispose();
+    address1Controller.dispose();
+    address2Controller.dispose();
+    cityController.dispose();
+    pinCodeController.dispose();
+    phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLocateMe() async {
+    setState(() => _isLocating = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showErrorSnackBar('Location services are disabled.');
+        setState(() => _isLocating = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showErrorSnackBar('Location permissions are denied.');
+          setState(() => _isLocating = false);
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _showErrorSnackBar('Location permissions are permanently denied.');
+        setState(() => _isLocating = false);
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+
+      if (placemarks.isNotEmpty) {
+        final placemark = placemarks[0];
+        setState(() {
+          address1Controller.text = '${placemark.name}, ${placemark.thoroughfare}';
+          address2Controller.text = placemark.subLocality ?? '';
+          cityController.text = placemark.locality ?? '';
+          pinCodeController.text = placemark.postalCode ?? '';
+          if (placemark.administrativeArea != null && indianStates.contains(placemark.administrativeArea)) {
+            selectedState = placemark.administrativeArea;
+          }
+        });
+      }
+    } catch (e) {
+      _showErrorSnackBar('Failed to get location: ${e.toString()}');
+    } finally {
+      setState(() => _isLocating = false);
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
+    }
+  }
+
+  void _saveOrUpdateAddress() {
+    if (_formKey.currentState!.validate()) {
+      final fullAddress = [
+        address1Controller.text.trim(),
+        address2Controller.text.trim(),
+        cityController.text.trim(),
+        pinCodeController.text.trim(),
+        selectedState ?? ''
+      ].where((s) => s.isNotEmpty).join(', ');
+
+      final newAddress = Address(
+        id: widget.addressToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        title: labelController.text.trim(),
+        fullAddress: fullAddress,
+        phone: '+91 ${phoneController.text.trim()}',
+        icon: _getIconForLabel(labelController.text.trim()),
+      );
+
+      Navigator.pop(context, newAddress);
+    } else {
+      _showErrorSnackBar('Please fix the errors in the form.');
+    }
+  }
+
+  IconData _getIconForLabel(String label) {
+    String lowerLabel = label.toLowerCase();
+    if (lowerLabel.contains('home')) return Icons.home_outlined;
+    if (lowerLabel.contains('office') || lowerLabel.contains('work')) return Icons.apartment_outlined;
+    return Icons.location_on_outlined;
   }
 
   @override
   Widget build(BuildContext context) {
-    // The Theme wrapper is no longer necessary since we removed persistentFooterButtons
+    final isEditing = widget.addressToEdit != null;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          "Add New Address",
-          style: TextStyle(
-            color: Color(0xFF121111),
-            fontSize: 16,
-            fontFamily: 'Encode Sans',
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: Text(isEditing ? "Edit Address" : "Add New Address", style: const TextStyle(color: Color(0xFF121111), fontSize: 16, fontFamily: 'Encode Sans', fontWeight: FontWeight.w600)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -63,168 +197,142 @@ class _AddNewAddressScreenState extends State<AddNewAddressScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Map and Locate Me Button Section
             Stack(
               alignment: Alignment.center,
               children: [
                 Image.network(
-                  "https://picsum.photos/428/250", // Using a reliable placeholder
+                  "https://i.stack.imgur.com/g2242.png", // Generic map image
                   width: double.infinity,
                   height: 250,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    // Gracefully handle image load errors
-                    return Container(
-                      width: double.infinity,
-                      height: 250,
-                      color: Colors.grey[300],
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.map,
-                        color: Colors.grey,
-                        size: 50,
-                      ),
-                    );
-                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    width: double.infinity,
+                    height: 250,
+                    color: Colors.grey[300],
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.map, color: Colors.grey, size: 50),
+                  ),
                 ),
                 Positioned(
                   bottom: 20,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Implement locate me functionality
-                    },
+                  child: ElevatedButton.icon(
+                    onPressed: _isLocating ? null : _handleLocateMe,
+                    icon: _isLocating ? Container(width: 20, height: 20, margin: const EdgeInsets.only(right: 8), child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.black,)) : const Icon(Icons.my_location),
+                    label: Text(_isLocating ? 'Locating...' : 'Locate Me'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFCCF656),
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(60),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 40,
-                        vertical: 15,
-                      ),
-                    ),
-                    child: const Text(
-                      'Locate Me',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'Encode Sans',
-                        fontWeight: FontWeight.w500,
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(60)),
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                     ),
                   ),
                 ),
               ],
             ),
-
-            // Form Section
             Padding(
               padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Add New Address',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontFamily: 'DM Sans',
-                      fontWeight: FontWeight.w500,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(isEditing ? 'Update Address Details' : 'Or, Add Address Details Manually', style: const TextStyle(color: Colors.black, fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 20),
+
+                    _CustomTextField(
+                      controller: labelController,
+                      labelText: 'Label (e.g. Home, Office)',
+                      hintText: 'Enter a label for this address',
+                      maxLength: 20,
+                      validator: (value) => value == null || value.isEmpty ? 'Please enter a label' : null,
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  _CustomTextField(
-                    controller: address1,
-                    hintText: 'Enter Address',
-                    labelText: 'Address line - 1',
-                  ),
-                  const SizedBox(height: 16),
-                  _CustomTextField(
-                    controller: address2,
-                    hintText: 'Enter Address',
-                    labelText: 'Address line - 2',
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: _CustomTextField(
-                          controller: pinCode,
-                          hintText: 'Enter Pin Code',
-                          labelText: 'Pin Code',
-                          keyboardType: TextInputType.number,
+                    const SizedBox(height: 16),
+
+                    _CustomTextField(
+                      controller: address1Controller,
+                      labelText: 'Address line - 1',
+                      hintText: 'Enter Flat No, Building Name, Street',
+                      maxLength: 150,
+                      validator: (value) => value == null || value.isEmpty ? 'Address line 1 is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    _CustomTextField(
+                      controller: address2Controller,
+                      labelText: 'Address line - 2 (Optional)',
+                      hintText: 'Enter Area, Landmark',
+                      maxLength: 150,
+                    ),
+                    const SizedBox(height: 16),
+
+                    _CustomTextField(
+                      controller: cityController,
+                      labelText: 'City',
+                      hintText: 'Enter City',
+                      validator: (value) => value == null || value.isEmpty ? 'Please enter a city' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _CustomDropdown(
+                            value: selectedState,
+                            labelText: 'State',
+                            hint: 'Select State',
+                            items: indianStates,
+                            onChanged: (value) => setState(() => selectedState = value),
+                            validator: (value) => value == null ? 'Please select a state' : null,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _CustomDropdown(
-                          value: selectedState,
-                          hint: 'Select State',
-                          labelText: 'State',
-                          items: states,
-                          onChanged: (value) {
-                            setState(() {
-                              selectedState = value;
-                            });
-                          },
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _CustomTextField(
+                            controller: pinCodeController,
+                            labelText: 'Pin Code',
+                            hintText: '6 digits',
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            maxLength: 6,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) return 'Required';
+                              if (value.length != 6) return '6 digits only';
+                              return null;
+                            },
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _CustomTextField(
-                    controller: phone,
-                    hintText: 'Enter Phone Number',
-                    labelText: 'Phone',
-                    keyboardType: TextInputType.phone,
-                    prefixText: '+91',
-                  ),
-                  const SizedBox(height: 16),
-                  // Optional Fields
-                  _CustomTextField(
-                    controller: latitude,
-                    hintText: 'Enter Latitude',
-                    labelText: 'Latitude (Optional)',
-                  ),
-                  const SizedBox(height: 16),
-                  _CustomTextField(
-                    controller: longitude,
-                    hintText: 'Enter Longitude',
-                    labelText: 'Longitude (Optional)',
-                  ),
-                  const SizedBox(height: 32), // Added space before the button
-                  // MOVED BUTTON HERE
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context, {
-                        "address1": address1.text,
-                        "address2": address2.text,
-                        "pinCode": pinCode.text,
-                        "state": selectedState,
-                        "phone": phone.text,
-                        "lat": latitude.text,
-                        "lng": longitude.text,
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      backgroundColor: const Color(0xFFCCF656),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                      ],
                     ),
-                    child: const Text(
-                      "Select",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'Encode Sans',
-                        fontWeight: FontWeight.w700,
-                      ),
+                    const SizedBox(height: 16),
+
+                    _CustomTextField(
+                      controller: phoneController,
+                      labelText: 'Phone',
+                      hintText: '10-digit number',
+                      keyboardType: TextInputType.phone,
+                      prefixText: '+91',
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Phone number is required';
+                        if (value.length != 10) return 'Must be 10 digits';
+                        return null;
+                      },
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 32),
+
+                    ElevatedButton(
+                      onPressed: _saveOrUpdateAddress,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: const Color(0xFFCCF656),
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      child: Text(isEditing ? "Update Address" : "Save Address", style: const TextStyle(fontSize: 16, fontFamily: 'Encode Sans', fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -234,13 +342,15 @@ class _AddNewAddressScreenState extends State<AddNewAddressScreen> {
   }
 }
 
-// Custom widget for TextFields to match Figma design
 class _CustomTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final String labelText;
   final String? prefixText;
   final TextInputType? keyboardType;
+  final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
+  final String? Function(String?)? validator;
 
   const _CustomTextField({
     required this.controller,
@@ -248,6 +358,9 @@ class _CustomTextField extends StatelessWidget {
     required this.labelText,
     this.prefixText,
     this.keyboardType,
+    this.maxLength,
+    this.inputFormatters,
+    this.validator,
   });
 
   @override
@@ -255,55 +368,32 @@ class _CustomTextField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          labelText,
-          style: const TextStyle(
-            color: Color(0xFFABABAB),
-            fontSize: 14,
-            fontFamily: 'Encode Sans',
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        Text(labelText, style: const TextStyle(color: Color(0xFFABABAB), fontSize: 14, fontFamily: 'Encode Sans', fontWeight: FontWeight.w500)),
         const SizedBox(height: 6),
-        TextField(
+        TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
+          validator: validator,
           decoration: InputDecoration(
+            counterText: "",
             hintText: hintText,
-            hintStyle: const TextStyle(
-              color: Color(0xFF616161),
-              fontSize: 16,
-              fontFamily: 'Encode Sans',
-            ),
-            prefixIcon:
-                prefixText != null
-                    ? Padding(
-                      padding: const EdgeInsets.only(
-                        left: 24,
-                        right: 8,
-                        top: 15,
-                        bottom: 15,
-                      ),
-                      child: Text(
-                        prefixText!,
-                        style: const TextStyle(
-                          color: Color(0xFF616161),
-                          fontSize: 16,
-                          fontFamily: 'Plus Jakarta Sans',
-                        ),
-                      ),
-                    )
-                    : null,
+            hintStyle: const TextStyle(color: Color(0xFF616161), fontSize: 16, fontFamily: 'Encode Sans'),
+            prefixIcon: prefixText != null
+                ? Padding(
+              padding: const EdgeInsets.only(left: 24, right: 8, top: 13, bottom: 13),
+              child: Text(prefixText!, style: const TextStyle(color: Color(0xFF616161), fontSize: 16, fontFamily: 'Plus Jakarta Sans')),
+            )
+                : null,
             filled: true,
             fillColor: const Color(0xFFF2F4F5),
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 15,
-              horizontal: 24,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(70),
-              borderSide: BorderSide.none,
-            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 24),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: const BorderSide(color: Colors.black, width: 1.5)),
+            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: const BorderSide(color: Colors.red, width: 1.5)),
+            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: const BorderSide(color: Colors.red, width: 1.5)),
             isDense: true,
           ),
         ),
@@ -312,13 +402,13 @@ class _CustomTextField extends StatelessWidget {
   }
 }
 
-// Custom widget for the Dropdown to match Figma design
 class _CustomDropdown extends StatelessWidget {
   final String? value;
   final String hint;
   final String labelText;
   final List<String> items;
   final ValueChanged<String?> onChanged;
+  final String? Function(String?)? validator;
 
   const _CustomDropdown({
     required this.value,
@@ -326,6 +416,7 @@ class _CustomDropdown extends StatelessWidget {
     required this.labelText,
     required this.items,
     required this.onChanged,
+    this.validator,
   });
 
   @override
@@ -333,47 +424,31 @@ class _CustomDropdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          labelText,
-          style: const TextStyle(
-            color: Color(0xFFABABAB),
-            fontSize: 14,
-            fontFamily: 'Encode Sans',
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        Text(labelText, style: const TextStyle(color: Color(0xFFABABAB), fontSize: 14, fontFamily: 'Encode Sans', fontWeight: FontWeight.w500)),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           value: value,
           onChanged: onChanged,
-          hint: Text(
-            hint,
-            style: const TextStyle(
-              color: Color(0xFF616161),
-              fontSize: 16,
-              fontFamily: 'Encode Sans',
-            ),
-          ),
+          validator: validator,
+          hint: Text(hint, style: const TextStyle(color: Color(0xFF616161), fontSize: 16, fontFamily: 'Encode Sans')),
+          isExpanded: true,
           decoration: InputDecoration(
             filled: true,
             fillColor: const Color(0xFFF2F4F5),
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 15,
-              horizontal: 24,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(70),
-              borderSide: BorderSide.none,
-            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 24),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: const BorderSide(color: Colors.black, width: 1.5)),
+            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: const BorderSide(color: Colors.red, width: 1.5)),
+            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(70), borderSide: const BorderSide(color: Colors.red, width: 1.5)),
             isDense: true,
           ),
-          items:
-              items.map((String state) {
-                return DropdownMenuItem<String>(
-                  value: state,
-                  child: Text(state),
-                );
-              }).toList(),
+          items: items.map((String state) {
+            return DropdownMenuItem<String>(
+              value: state,
+              child: Text(state, overflow: TextOverflow.ellipsis),
+            );
+          }).toList(),
         ),
       ],
     );

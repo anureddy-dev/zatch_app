@@ -54,6 +54,7 @@ dependencies:
   socket_io_client:
   another_flushbar:
   image_picker:
+  geocoding:
 dev_dependencies:
   flutter_test:
     sdk: flutter

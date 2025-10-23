@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:zatch_app/controller/live_stream_controller.dart';
 import 'package:zatch_app/model/TrendingBit.dart';
 import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/ReelDetailsScreen.dart';
@@ -119,7 +120,7 @@ class TrendingCard extends StatelessWidget {
             context,
             MaterialPageRoute(
                 builder: (_) =>
-                    ReelDetailsScreen(bitId: bit.id ?? '')), // use actual id
+                    ReelDetailsScreen(bitId: bit.id ?? '', controller: LiveStreamController())), // use actual id
           );
         }
       },
@@ -143,7 +144,7 @@ class TrendingCard extends StatelessWidget {
               Stack(
                 children: [
                   Image.network(
-                    bit.videoUrl ?? bit.videoUrl ?? '',
+                    bit.thumbnailUrl,
                     height: 200,
                     width: double.infinity,
                     fit: BoxFit.cover,

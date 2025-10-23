@@ -1,8 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:zatch_app/Widget/bargain_picks_widget.dart';
+import 'package:zatch_app/Widget/top_picks_this_week_widget.dart';
 import 'package:zatch_app/model/product_response.dart';
+import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/services/api_service.dart';
+import 'package:zatch_app/view/cart_screen.dart';
+import 'package:zatch_app/view/rate_order_dialog.dart';
+import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
+
+import '../setting_view/profile_screen.dart';
+
+
+class AllReviewsScreen extends StatelessWidget {
+  final List<Review> reviews;
+  const AllReviewsScreen({super.key, required this.reviews});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("All Reviews")),
+      body: ListView.builder(
+        itemCount: reviews.length,
+        itemBuilder: (context, index) {
+          final review = reviews[index];
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  backgroundImage: NetworkImage(review.userAvatarUrl),
+                  radius: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: List.generate(
+                          5,
+                              (starIndex) => Icon(
+                            starIndex < review.rating ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(review.comment, style: TextStyle(color: Colors.grey[700])),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class AllCommentsScreen extends StatelessWidget {
+  final List<Comment> comments;
+  const AllCommentsScreen({super.key, required this.comments});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("All Comments")),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: comments.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          return CommentWidget(comment: comments[index]);
+        },
+      ),
+    );
+  }
+}
+// endregion
 
 class Review {
   final String userName;
@@ -17,6 +98,7 @@ class Review {
     required this.comment,
   });
 }
+
 class Comment {
   final String userName;
   final String userAvatar;
@@ -42,39 +124,39 @@ class ProductDetailScreen extends StatefulWidget {
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
 }
 
-class _ProductDetailScreenState extends State<ProductDetailScreen>
-    with SingleTickerProviderStateMixin {
+class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTickerProviderStateMixin {
+  UserProfileResponse? userProfile;
+
   final _pageController = PageController();
   late final TabController _tabController;
-  int _selectedSizeIndex = 2;
-  int _selectedColorIndex = 1;
+  int _selectedSizeIndex = -1;
+  int _selectedColorIndex = -1;
   final ApiService _apiService = ApiService();
 
   bool loading = true;
   String? errorMessage;
   late Product product;
   List<Product> similarProducts = [];
-  bool _showAllInfo = false;
   bool _showAllCommunity = false;
   bool _showAllReviews = false;
 
-  final List<Review> reviews = [
-    Review(
-        userName: 'Veronika',
-        userAvatarUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
-        rating: 5,
-        comment: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit...'),
-    Review(
-        userName: 'Esther',
-        userAvatarUrl: 'https://randomuser.me/api/portraits/women/65.jpg',
-        rating: 4,
-        comment: 'I love this so much! Stay long.'),
-    Review(
-        userName: 'Eren Yeager',
-        userAvatarUrl: 'https://randomuser.me/api/portraits/men/33.jpg',
-        rating: 5,
-        comment: 'This is very refreshing 😄'),
-  ];
+  final List<Review> reviews = List.generate(
+    15,   (i) => Review(
+        userName: 'User ${i + 1}',
+        userAvatarUrl: 'https://randomuser.me/api/portraits/${i % 2 == 0 ? "women" : "men"}/${i + 1}.jpg',
+        rating: (i % 3) + 3,
+        comment: 'This is review number ${i + 1}. The product is great!'),
+  );
+
+  final List<Comment> comments = List.generate(
+    20,   (i) => Comment(
+      userName: "UserCommenter${i + 1}",
+      userAvatar: "https://randomuser.me/api/portraits/thumb/${i % 2 == 0 ? "men" : "women"}/${i + 20}.jpg",
+      text: "This is comment number ${i + 1}.",
+      timeAgo: "${i + 1}h",
+      likes: (i + 1) * 2,
+    ),
+  );
 
   @override
   void initState() {
@@ -132,32 +214,40 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         slivers: [
           _buildSliverAppBar(),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 24),
-                  _buildTitlePriceAndRating(),
-                  const SizedBox(height: 16),
-                  _buildDescription(),
-                  const SizedBox(height: 24),
-                  _buildSizeSelector(),
-                  const SizedBox(height: 24),
-                  _buildColorSelector(),
-                  const SizedBox(height: 24),
-                  _buildInfoTabs(),
-                  const SizedBox(height: 24),
-                  _buildProductSection("Similar Products", similarProducts),
-                  const SizedBox(height: 32),
-                  _buildPolicySection(),
-                  const SizedBox(height: 32),
-                  _buildProductSection("Products from this Seller", similarProducts),
-                  const SizedBox(height: 32),
-                  const BargainPicksWidget(),
-                  const SizedBox(height: 120),
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildTitlePriceAndRating(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildDescription(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildSizeSelector(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildColorSelector(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildInfoTabs(),
+                ),
+                TopPicksThisWeekWidget(title: "Similar products",showSeeAll: false,),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildPolicySection(),
+                ),
+                TopPicksThisWeekWidget(title: "Products from this seller",showSeeAll: false,),
+                const SizedBox(height: 32),
+                const BargainPicksWidget(),
+                const SizedBox(height: 16),
+              ],
             ),
           ),
         ],
@@ -192,27 +282,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       leading: Padding(
         padding: const EdgeInsets.only(left: 16.0),
         child: Center(
-          child: _buildCircleIcon(Icons.arrow_back_ios_new,
-                  () => Navigator.of(context).pop()),
+          child: _buildCircleIcon(Icons.arrow_back_ios_new, () => Navigator.of(context).pop()),
         ),
       ),
       actions: [
-        _buildCircleIcon(Icons.bookmark_border, () {}),
+        _buildCircleIcon(Icons.bookmark_border, () {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Added to Saved Items!")));
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProfileScreen(userProfile),
+            ),
+          );
+        }),
         const SizedBox(width: 8),
-        _buildCircleIcon(Icons.shopping_cart_outlined, () {}),
+        _buildCircleIcon(Icons.shopping_cart_outlined, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CartScreen(),
+            ),
+          );
+        }),
         const SizedBox(width: 16),
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: ClipRRect(
-          borderRadius:
-          const BorderRadius.vertical(bottom: Radius.circular(40)),
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(40)),
           child: Stack(
             fit: StackFit.expand,
             children: [
               PageView.builder(
                 controller: _pageController,
-                itemCount: product.images.length,
+                itemCount: product.images.isNotEmpty ? product.images.length : 1,
                 itemBuilder: (context, index) {
+                  if (product.images.isEmpty) {
+                    return Container(
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                    );
+                  }
                   return Image.network(
                     product.images[index].url,
                     fit: BoxFit.cover,
@@ -223,8 +332,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
                         color: Colors.grey.shade300,
-                        child: const Icon(Icons.broken_image,
-                            color: Colors.grey),
+                        child: const Icon(Icons.broken_image, color: Colors.grey),
                       );
                     },
                   );
@@ -235,30 +343,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.3),
-                      Colors.black.withOpacity(0.6),
-                    ],
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.3), Colors.black.withOpacity(0.6)],
                   ),
                 ),
               ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 24.0),
-                  child: SmoothPageIndicator(
-                    controller: _pageController,
-                    count: product.images.length,
-                    effect: const WormEffect(
-                      dotHeight: 10,
-                      dotWidth: 10,
-                      activeDotColor: Color(0xFFCCF656),
-                      dotColor: Colors.white,
+              if (product.images.length > 1)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 24.0),
+                    child: SmoothPageIndicator(
+                      controller: _pageController,
+                      count: product.images.length,
+                      effect: const WormEffect(
+                        dotHeight: 10,
+                        dotWidth: 10,
+                        activeDotColor: Color(0xFFCCF656),
+                        dotColor: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -268,51 +373,65 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   }
 
   Widget _buildTitlePriceAndRating() {
-    return Stack(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              product.name,
-              style: const TextStyle(
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                product.name,
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF121111),
-                  height: 1.3),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(Icons.star, color: Colors.amber, size: 18),
-                const SizedBox(width: 4),
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      const TextSpan(
-                          text: '5.0 ',
-                          style:
-                          TextStyle(color: Color(0xFF787676), fontSize: 12)),
-                      TextSpan(
-                        text: '(${product.viewCount ?? 0} reviews)',
-                        style: const TextStyle(
-                            color: Color(0xFF347EFB), fontSize: 12),
-                      ),
-                    ],
-                  ),
+                  height: 1.3,
                 ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.star, color: Colors.amber, size: 18),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () {
+                      _tabController.animateTo(2);
+                    },
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          const TextSpan(
+                            text: '5.0 ',
+                            style: TextStyle(color: Color(0xFF787676), fontSize: 12),
+                          ),
+                          TextSpan(
+                            text: '(${reviews.length} reviews)',
+                            style: const TextStyle(
+                              color: Color(0xFF347EFB),
+                              fontSize: 12,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        Align(
-          alignment: Alignment.topRight,
+        Padding(
+          padding: const EdgeInsets.only(left: 16.0),
           child: Text(
             '${product.price} ₹',
             style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF292526)),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF292526),
+            ),
           ),
         ),
       ],
@@ -322,20 +441,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   Widget _buildDescription() {
     return Text(
       product.description,
-      style: const TextStyle(
-          fontSize: 12, color: Color(0xFF787676), height: 1.5),
+      style: const TextStyle(fontSize: 12, color: Color(0xFF787676), height: 1.5),
     );
   }
 
-
-Widget _buildSizeSelector() {
-    // Fixed order of sizes
+  Widget _buildSizeSelector() {
     final List<String> sizes = ["XS", "S", "M", "L", "XL", "XXL"];
-
-    // Auto-select based on product.size from API
     if (_selectedSizeIndex == -1 && product.size != null) {
-      final initialIndex =
-      sizes.indexWhere((s) => s.toLowerCase() == product.size!.toLowerCase());
+      final initialIndex = sizes.indexWhere((s) => s.toLowerCase() == product.size!.toLowerCase());
       if (initialIndex != -1) {
         _selectedSizeIndex = initialIndex;
       }
@@ -344,10 +457,7 @@ Widget _buildSizeSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Choose Size',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
+        const Text('Choose Size', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -382,28 +492,16 @@ Widget _buildSizeSelector() {
   }
 
   Widget _buildColorSelector() {
-    // Map of color names -> actual Flutter Color
     final Map<String, Color> colorMap = {
-      "Grey": const Color(0xFF787676),
-      "Dark Grey": const Color(0xFF433F40),
-      "Red": const Color(0xFFFF7979),
-      "Orange": const Color(0xFFFFB979),
-      "Green": const Color(0xFFB7FF79),
-      "Sky Blue": const Color(0xFF79E6FF),
-      "Blue": const Color(0xFF798BFF),
-      "Purple": const Color(0xFFA579FF),
-      "Pink": const Color(0xFFFF79F1),
+      "Grey": const Color(0xFF787676), "Dark Grey": const Color(0xFF433F40), "Red": const Color(0xFFFF7979),
+      "Orange": const Color(0xFFFFB979), "Green": const Color(0xFFB7FF79), "Sky Blue": const Color(0xFF79E6FF),
+      "Blue": const Color(0xFF798BFF), "Purple": const Color(0xFFA579FF), "Pink": const Color(0xFFFF79F1),
       "Dark Red": const Color(0xFFE10E12),
     };
-
     final List<String> colorNames = colorMap.keys.toList();
     final List<Color> colors = colorMap.values.toList();
-
-    // Auto-select if product.color matches
     if (_selectedColorIndex == -1 && product.color != null) {
-      final initialIndex = colorNames.indexWhere(
-            (c) => c.toLowerCase() == product.color!.toLowerCase(),
-      );
+      final initialIndex = colorNames.indexWhere((c) => c.toLowerCase() == product.color!.toLowerCase());
       if (initialIndex != -1) {
         _selectedColorIndex = initialIndex;
       }
@@ -412,8 +510,7 @@ Widget _buildSizeSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Color',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        const Text('Color', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         const SizedBox(height: 12),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -427,16 +524,9 @@ Widget _buildSizeSelector() {
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color:
-                      isSelected ? const Color(0xFF433F40) : Colors.transparent,
-                      width: 2,
-                    ),
+                    border: Border.all(color: isSelected ? const Color(0xFF433F40) : Colors.transparent, width: 2),
                   ),
-                  child: CircleAvatar(
-                    radius: 13,
-                    backgroundColor: colors[index],
-                  ),
+                  child: CircleAvatar(radius: 13, backgroundColor: colors[index]),
                 ),
               );
             }),
@@ -456,6 +546,8 @@ Widget _buildSizeSelector() {
             borderRadius: BorderRadius.circular(16),
           ),
           child: TabBar(
+            tabAlignment: TabAlignment.start,
+            isScrollable: true,
             controller: _tabController,
             labelColor: Colors.black,
             unselectedLabelColor: Colors.black,
@@ -464,25 +556,26 @@ Widget _buildSizeSelector() {
               borderRadius: BorderRadius.circular(16),
             ),
             dividerColor: Colors.transparent,
-            indicatorPadding:
-            const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            indicatorPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             indicatorSize: TabBarIndicatorSize.tab,
-            tabs: const [
-              Tab(text: 'Basic Info'),
-              Tab(text: 'Comments(113)'),
-              Tab(text: 'Reviews'),
+            tabs: [
+              const Tab(text: 'Basic Info'),
+              Tab(text: 'Comments (${comments.length})'), // Shows full number
+              Tab(text: 'Reviews (${reviews.length})'), // Shows full number
             ],
           ),
         ),
         SizedBox(
-          height: 250,
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildBasicInfoTab(),
-               _buildCommunityTab(),
-              _buildReviewsTab(),
-            ],
+           child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 300), // Adjust as needed
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildBasicInfoTab(),
+                _buildCommunityTab(),
+                _buildReviewsTab(),
+              ],
+            ),
           ),
         ),
       ],
@@ -495,87 +588,88 @@ Widget _buildSizeSelector() {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Info", style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text("Description", style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text(product.info1.toString(),
-            maxLines: _showAllInfo ? null : 2,
-            overflow: _showAllInfo ? TextOverflow.visible : TextOverflow.ellipsis,
-          ),
+          Text(product.info1.toString()),
           const SizedBox(height: 16),
-          const Text("info2", style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text("Additional Information", style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text(
-            "${product.info2}",
-            maxLines: _showAllInfo ? null : 2,
-            overflow: _showAllInfo ? TextOverflow.visible : TextOverflow.ellipsis,
-          ),
+          Text(product.info2.toString()),
         ],
       ),
     );
   }
+
   Widget _buildCommunityTab() {
-    final List<Comment> comments = [
-      Comment(
-        userName: "Erenyaeger",
-        userAvatar: "https://placehold.co/45x45",
-        text: "It looks very refreshing ☺️",
-        timeAgo: "12 h",
-        likes: 3,
-      ),
-      Comment(
-        userName: "Yalenanam",
-        userAvatar: "https://placehold.co/45x45",
-        text: "You seem to be having fun 🔥",
-        timeAgo: "8 h",
-        likes: 21,
-      ),
-      Comment(
-        userName: "Edanorman",
-        userAvatar: "https://placehold.co/45x45",
-        text: "I love this so much! Slay king.",
-        timeAgo: "8 h",
-        likes: 21,
-      ),
-    ];
+    final bool canExpand = comments.length <= 10;
+    final displayCount = _showAllCommunity ? comments.length : (comments.length > 2 ? 2 : comments.length);
 
-    final displayCount = _showAllCommunity ? comments.length : 2;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: displayCount,
-          separatorBuilder: (_, __) => const SizedBox(height: 16),
-          itemBuilder: (context, index) {
-            return CommentWidget(comment: comments[index]);
-          },
-        ),
-
-        if (!_showAllCommunity)
-          GestureDetector(
-            onTap: () => setState(() => _showAllCommunity = true),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12.0),
-              child: Text(
-                "View all",
-                style: TextStyle(color: Colors.blue, fontSize: 14),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: displayCount,
+            separatorBuilder: (_, __) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              return CommentWidget(comment: comments[index]);
+            },
+          ),
+          // CORRECTED LOGIC: Show "View all" if there are more than 2 comments and the list is not already expanded.
+          if (comments.length > 2 && !_showAllCommunity)
+            GestureDetector(
+              onTap: () {
+                // If the total count is 10 or less, expand in place.
+                if (canExpand) {
+                  setState(() => _showAllCommunity = true);
+                } else {
+                  // Otherwise, navigate to the new screen.
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AllCommentsScreen(comments: comments),
+                    ),
+                  );
+                }
+              },
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12.0),
+                child: Center(child: Text("View all", style: TextStyle(color: Colors.blue, fontSize: 14))),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
-
   Widget _buildReviewsTab() {
-    final displayCount = _showAllReviews ? reviews.length : 2;
+    final bool canExpand = reviews.length <= 10;
+    final displayCount = _showAllReviews ? reviews.length : (reviews.length > 2 ? 2 : reviews.length);
 
-    return Column(
-      children: [
-        Expanded(
-          child: ListView.builder(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                showReviewDialog(context, product);
+              },
+              icon: const Icon(Icons.rate_review_outlined,color: Colors.black,),
+              label: const Text("Add a Review",style: TextStyle(color: Colors.black),),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 40),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: displayCount,
             itemBuilder: (context, index) {
               final review = reviews[index];
@@ -584,33 +678,20 @@ Widget _buildSizeSelector() {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      backgroundImage: NetworkImage(review.userAvatarUrl),
-                      radius: 20,
-                    ),
+                    CircleAvatar(backgroundImage: NetworkImage(review.userAvatarUrl), radius: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(review.userName,
-                              style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
                           Row(
-                            children: List.generate(
-                              5,
-                                  (starIndex) => Icon(
-                                starIndex < review.rating
-                                    ? Icons.star
-                                    : Icons.star_border,
-                                color: Colors.amber,
-                                size: 16,
-                              ),
-                            ),
+                            children: List.generate(5, (starIndex) =>
+                                Icon(starIndex < review.rating ? Icons.star : Icons.star_border, color: Colors.amber, size: 16)),
                           ),
                           const SizedBox(height: 8),
-                          Text(review.comment,
-                              style: TextStyle(color: Colors.grey[700])),
+                          Text(review.comment, style: TextStyle(color: Colors.grey[700])),
                         ],
                       ),
                     ),
@@ -619,136 +700,26 @@ Widget _buildSizeSelector() {
               );
             },
           ),
-        ),
-        if (!_showAllReviews)
-          GestureDetector(
-            onTap: () => setState(() => _showAllReviews = true),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: Text("View all", style: TextStyle(color: Colors.blue)),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildProductSection(String title, List<Product> products) {
-    if (products.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 270,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              return _buildProductCard(products[index]);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProductCard(Product product) {
-    return Container(
-      width: 159,
-      margin: const EdgeInsets.only(right: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F4F4),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              if (product.images.isNotEmpty)
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                  ),
-                  child: Image.network(
-                    product.images.first.url, // Use product image
-                    height: 177,
-                    width: 159,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 177,
-                      width: 159,
-                      color: Colors.grey.shade200,
-                      child: const Icon(Icons.error, color: Colors.grey),
-                    ),
-                  ),
-                ),
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Container(
-                  width: 42,
-                  height: 44,
-                  decoration: const ShapeDecoration(
-                    color: Color(0xFFBBF711),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.only(
-                        topRight: Radius.circular(6),
-                        bottomLeft: Radius.circular(16),
-                      ),
-                    ),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '56%\nOFF',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 10,
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
-                      ),
-                    ),
-                  ),
-                ),
+          // CORRECTED LOGIC: Show "View all" if there are more than 2 reviews and the list is not already expanded.
+          if (reviews.length > 2 && !_showAllReviews)
+            GestureDetector(
+              onTap: () {
+                // If the total count is 10 or less, expand in place.
+                if (canExpand) {
+                  setState(() => _showAllReviews = true);
+                } else {
+                  // Otherwise, navigate to the new screen.
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => AllReviewsScreen(reviews: reviews)),
+                  );
+                }
+              },
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Center(child: Text("View all", style: TextStyle(color: Colors.blue))),
               ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: Color(0xFF272727)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '\$${product.price}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF272727)),
-                ),
-                const Divider(color: Color(0xFFDDDDDD), height: 16),
-                Text(
-                  '${product.stock ?? 0} sold this week',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF249B3E)),
-                ),
-              ],
             ),
-          ),
         ],
       ),
     );
@@ -766,7 +737,8 @@ Widget _buildSizeSelector() {
             tilePadding: EdgeInsets.zero,
             leading: const Icon(Icons.local_shipping_outlined, color: Colors.black),
             title: const Text("Free Flat Rate Shipping", style: TextStyle(fontSize: 14)),
-            subtitle: const Text("Estimated to be delivered on 09/11/2021 - 12/11/2021.", style: TextStyle(fontSize: 12, color: Color(0xFF555555))),
+            subtitle: const Text("Estimated to be delivered on 09/11/2021 - 12/11/2021.",
+                style: TextStyle(fontSize: 12, color: Color(0xFF555555))),
             children: const [Padding(padding: EdgeInsets.all(16.0), child: Text("Details about free flat rate shipping."))],
           ),
         ),
@@ -805,26 +777,48 @@ Widget _buildSizeSelector() {
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: () {},
+              // ✅ FIX: Zatch button is now clickable
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zatch button clicked!")));
+              },
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: const BorderSide(color: Color(0xFF249B3E)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: const BorderSide(color: Color(0xFF249B3E)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
               child: const Text('Zatch', style: TextStyle(color: Colors.black, fontSize: 16)),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                final CartItem itemToPurchase = CartItem(
+                  name: product.name,
+                  price: product.price,
+                  quantity: 1,
+                  imageUrl: product.images.isNotEmpty ? product.images.first.url : '',
+                  description: product.description,  );
+                final List<CartItem> itemsForCheckout = [itemToPurchase];
+                final double totalPrice = product.price;
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CheckoutOrPaymentsScreen(
+                      isCheckout: true,
+                      selectedItems: itemsForCheckout,
+                      itemsTotalPrice: totalPrice,
+                      subTotalPrice: totalPrice,
+                    ),
+                  ),
+                );
+              },
               style: ElevatedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF249B3E)),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                elevation: 0,
-              ),
-              child: const Text('Buy', style: TextStyle(color: Colors.black, fontSize: 16)),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: const BorderSide(color: Color(0xFF249B3E)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 0),
+              child: const Text('Buy Now', style: TextStyle(color: Colors.black, fontSize: 16)),
             ),
           ),
         ],
@@ -835,7 +829,7 @@ Widget _buildSizeSelector() {
 
 class CommentWidget extends StatelessWidget {
   final Comment comment;
-  const CommentWidget({Key? key, required this.comment}) : super(key: key);
+  const CommentWidget({super.key, required this.comment});
 
   @override
   Widget build(BuildContext context) {
@@ -844,20 +838,13 @@ class CommentWidget extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar
-          Container(
-            width: 45.21,
-            height: 45.21,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(19.62),
-              image: DecorationImage(
-                image: NetworkImage(comment.userAvatar),
-                fit: BoxFit.cover,
-              ),
-            ),
+          // ✅ FIX: User profile pictures now load from network
+          CircleAvatar(
+            radius: 22,
+            backgroundImage: NetworkImage(comment.userAvatar),
+            onBackgroundImageError: (e, s) => const Icon(Icons.person), // Fallback
           ),
           const SizedBox(width: 12),
-          // Name + comment + meta
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -865,57 +852,19 @@ class CommentWidget extends StatelessWidget {
                 Text.rich(
                   TextSpan(
                     children: [
-                      TextSpan(
-                        text: '${comment.userName}  ',
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      TextSpan(
-                        text: comment.text,
-                        style: TextStyle(
-                          color: Colors.black.withOpacity(0.80),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
+                      TextSpan(text: '${comment.userName}  ', style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w600)),
+                      TextSpan(text: comment.text, style: TextStyle(color: Colors.black.withOpacity(0.80), fontSize: 14, fontWeight: FontWeight.w400)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 6.56),
                 Row(
                   children: [
-                    Text(
-                      comment.timeAgo,
-                      style: TextStyle(
-                        color: Colors.black.withOpacity(0.30),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 0.24,
-                      ),
-                    ),
+                    Text(comment.timeAgo, style: TextStyle(color: Colors.black.withOpacity(0.30), fontSize: 12, fontWeight: FontWeight.w400)),
                     const SizedBox(width: 18),
-                    Text(
-                      '${comment.likes} likes',
-                      style: TextStyle(
-                        color: Colors.black.withOpacity(0.30),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 0.24,
-                      ),
-                    ),
+                    Text('${comment.likes} likes', style: TextStyle(color: Colors.black.withOpacity(0.30), fontSize: 12, fontWeight: FontWeight.w400)),
                     const SizedBox(width: 18),
-                    Text(
-                      'Reply',
-                      style: TextStyle(
-                        color: Colors.black.withOpacity(0.30),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 0.24,
-                      ),
-                    ),
+                    Text('Reply', style: TextStyle(color: Colors.black.withOpacity(0.30), fontSize: 12, fontWeight: FontWeight.w400)),
                   ],
                 ),
               ],

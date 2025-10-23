@@ -1244,13 +1244,29 @@ class _ReelDetailsScreenState extends State<ReelDetailsScreen>
                     onPressed: () {
                       Navigator.pop(context);
                       if (selectedOption == "buy") {
-                        // Navigate to Checkout screen
+                        final itemToCheckout = CartItem(
+                          name: product?.name ?? "Product Name",
+                          price: product?.price ?? 0.0,
+                          quantity: quantity, // The quantity selected in the bottom sheet
+                          imageUrl: product?.images.isNotEmpty == true
+                              ? product!.images.first.url
+                              : "https://placehold.co/100x100?text=P", description: product?.description ?? "",
+                        );
+
+                        // 2. Calculate the total prices.
+                        double itemsTotal = itemToCheckout.price * itemToCheckout.quantity;
+                        double shippingFee = 50.0; // Example: static shipping fee.
+                        double subTotalPrice = itemsTotal + shippingFee;
+
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) =>
-                                CheckoutOrPaymentsScreen(isCheckout: true,),
-                          ),
+                                CheckoutOrPaymentsScreen(isCheckout: true,
+                                  itemsTotalPrice: itemsTotal,
+                                  selectedItems: [itemToCheckout], // Pass the created item in a list
+                                  shippingFee: shippingFee,
+                                  subTotalPrice: subTotalPrice,),                          ),
                         );
                       } else {
                         // Navigate to Bargain screen

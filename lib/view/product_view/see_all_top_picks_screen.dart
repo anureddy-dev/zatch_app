@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:zatch_app/model/product_response.dart';
+import 'package:zatch_app/view/product_view/product_detail_screen.dart';
 
 class SeeAllTopPicksScreen extends StatelessWidget {
   final List<Product> products;
@@ -9,6 +10,7 @@ class SeeAllTopPicksScreen extends StatelessWidget {
 
   String formatPrice(num price) =>
       NumberFormat.currency(locale: 'en_US', symbol: "\$").format(price);
+  String formatSold(num sold) => NumberFormat.decimalPattern().format(sold);
 
   @override
   Widget build(BuildContext context) {
@@ -29,87 +31,152 @@ class SeeAllTopPicksScreen extends StatelessWidget {
         ),
       )
           : Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
         child: GridView.builder(
           itemCount: products.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, // ✅ 2x2 Grid
+            crossAxisCount: 2,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
-            childAspectRatio: 0.75, // Rectangular cards
+            childAspectRatio: 159 / 266, // Aspect ratio from the reference card
           ),
           itemBuilder: (context, index) {
             final product = products[index];
-            final imgUrl = product.images.isNotEmpty
-                ? product.images.first.url
-                : "https://via.placeholder.com/200";
+            // Using category image URL as in the reference widget
+            final imgUrl = product.category?.image?.url ??
+                "https://via.placeholder.com/159x177";
 
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12.withOpacity(0.1),
-                    blurRadius: 5,
-                    spreadRadius: 1,
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailScreen(productId: product.id),
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Product Image
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(10),
-                    ),
-                    child: Image.network(
-                      imgUrl,
-                      height: 140,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
+                );
+              },
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: ShapeDecoration(
+                  color: const Color(0xFFF4F4F4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
+                ),
+                child: Stack(
+                  children: [
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          product.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          formatPrice(product.price),
-                          style: const TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Row(
-                          children: [
-                            Icon(Icons.star,
-                                size: 14, color: Colors.amber),
-                            SizedBox(width: 4),
-                            Text(
-                              "5.0",
-                              style: TextStyle(fontSize: 12),
+                        // Product Image - using Expanded to fill available space
+                        Expanded(
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              image: DecorationImage(
+                                image: NetworkImage(imgUrl),
+                                fit: BoxFit.contain,
+                              ),
                             ),
-                          ],
+                          ),
+                        ),
+                        // Details Section
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.category?.name ?? "No Category",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF272727),
+                                  fontSize: 12,
+                                  fontFamily: 'Plus Jakarta Sans',
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    formatPrice(product.price),
+                                    style: const TextStyle(
+                                      color: Color(0xFF272727),
+                                      fontSize: 12,
+                                      fontFamily: 'Plus Jakarta Sans',
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: const [
+                                      Icon(Icons.star,
+                                          size: 14, color: Colors.amber),
+                                      SizedBox(width: 2),
+                                      Text(
+                                        '5.0', // Assuming a static value
+                                        style: TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 12,
+                                          fontFamily: 'Encode Sans',
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                width: double.infinity,
+                                height: 1,
+                                color: const Color(0xFFDDDDDD),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${formatSold(product.stock ?? 0)} sold this week',
+                                style: const TextStyle(
+                                  color: Color(0xFF249B3E),
+                                  fontSize: 12,
+                                  fontFamily: 'Plus Jakarta Sans',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    // Discount Badge
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFBBF711),
+                          borderRadius: BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomLeft: Radius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          '56% OFF', // Assuming a static value
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 10,
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },

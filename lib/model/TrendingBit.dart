@@ -3,6 +3,7 @@ class TrendingBit {
   final String title;
   final String description;
   final String videoUrl;
+  final String thumbnailUrl;
   final String badge;
   final int likeCount;
   final int viewCount;
@@ -16,6 +17,7 @@ class TrendingBit {
     required this.title,
     required this.description,
     required this.videoUrl,
+    required this.thumbnailUrl,
     required this.badge,
     required this.likeCount,
     required this.viewCount,
@@ -31,6 +33,7 @@ class TrendingBit {
       title: json['title'] as String,
       description: json['description'] as String,
       videoUrl: json['video']?['url'] ?? '',
+      thumbnailUrl: json['thumbnail']?['url'] ?? '',
       badge: json['badge'] ?? '',
       likeCount: json['likeCount'] ?? 0,
       viewCount: json['viewCount'] ?? 0,
@@ -38,7 +41,6 @@ class TrendingBit {
       shareLink: json['shareLink'] ?? '',
       createdAt: DateTime.parse(json['createdAt']),
       isLive: json['isLive'] ?? false,
-
     );
   }
 }

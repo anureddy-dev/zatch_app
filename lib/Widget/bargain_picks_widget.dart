@@ -66,7 +66,7 @@ class _BargainPicksWidgetState extends State<BargainPicksWidget> {
                   child: const Text(
                     'See All',
                     style: TextStyle(
-                      color: Colors.blueAccent,
+                      color: Colors.black,
                       fontSize: 12,
                       fontFamily: 'Plus Jakarta Sans',
                       fontWeight: FontWeight.w600,

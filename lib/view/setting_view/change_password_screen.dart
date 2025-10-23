@@ -36,7 +36,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   void initState() {
     super.initState();
     // Prefill current password if available (optional)
-    _currentCtrl.text = widget.userProfile?.user.password ?? "";
   }
 
   String? _validateNew(String? v) {

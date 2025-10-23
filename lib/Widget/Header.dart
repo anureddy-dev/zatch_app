@@ -65,8 +65,12 @@ class HeaderWidget extends StatelessWidget {
                       color: Colors.black,
                     ),
                     onPressed: () {
-                      Navigator.pushNamed(context, '/wishlist');
-                    },
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileScreen(userProfile),
+                        ),
+                      );                    },
                   ),
                   IconButton(
                     icon: Stack(
