@@ -16,6 +16,7 @@ import 'package:zatch_app/model/register_response_model.dart';
 import 'package:zatch_app/model/login_request.dart';
 import 'package:zatch_app/model/login_response.dart';
 import 'package:zatch_app/model/share_profile_response.dart';
+import 'package:zatch_app/model/toggle_save_bit.dart';
 import 'package:zatch_app/model/top_pick_res.dart' hide Product;
 import 'package:zatch_app/model/user_profile_model.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
@@ -601,13 +602,11 @@ class ApiService {
     try {
       final response = await _dio.get("/bits/trending");
       final Map<String, dynamic> data = response.data;
-
-      // ✅ CORRECTED: The key from your backend is "trendingBits"
-      if (data.containsKey('trendingBits') && data['trendingBits'] is List) {
-        final List bitsJson = data['trendingBits'];
+      if (data.containsKey('bits') && data['bits'] is List) {
+        final List bitsJson = data['bits'];
         return bitsJson.map((json) => TrendingBit.fromJson(json)).toList();
       } else {
-        throw Exception('API response is missing the "trendingBits" list.');
+        throw Exception('API response is missing the "bits" list.');
       }
     } on DioException catch (e) {
       debugPrint("DioException fetching trending bits: ${e.response?.data}");
@@ -617,8 +616,6 @@ class ApiService {
       throw Exception("Failed to fetch trending bits: $e");
     }
   }
-
-
 
   /// Get the user's search history
   Future<SearchHistoryResponse> getUserSearchHistory() async {
@@ -741,6 +738,119 @@ class ApiService {
         'success': false,
         'message': 'Unexpected error: $e',
       };
+    }
+  }
+
+  Future<Map<String, dynamic>> registerSellerStep({
+    required int step,
+    Map<String, dynamic>? payload,
+  }) async {
+    try {
+      final Map<String, dynamic> body = {"step": step};
+      if (payload != null) {
+        body.addAll(payload);
+      }
+
+      debugPrint("Seller Registration Step $step → $body");
+
+      final response = await _dio.post(
+        "/user/seller/register",
+        data: body,
+      );
+
+      final data = _decodeResponse(response.data);
+      debugPrint("Seller Registration Step $step Response: $data");
+
+      return data is Map<String, dynamic> ? data : {"success": false};
+    } on DioException catch (e) {
+      debugPrint("Seller Registration Step $step Error: ${e.response?.data}");
+      throw Exception(_handleError(e));
+    }
+  }
+
+  Future<String> getSellerTermsAndConditions() async {
+    try {
+      final response = await _dio.get("/user/seller/terms-and-conditions");
+      if (response.statusCode == 200) {
+        return response.data.toString();
+      } else {
+        throw Exception("Failed to load terms and conditions");
+      }
+    } catch (e) {
+      throw Exception("Error fetching terms: $e");
+    }
+  }
+
+  Future<ToggleSaveResponse> toggleBitSavedStatus(String bitId) async {
+    try {
+      // The endpoint is `/bits/:bitId/save` as per your previous code
+      final response = await _dio.post("/bits/$bitId/save");
+
+      // Decode the response and create the model
+      final data = _decodeResponse(response.data);
+
+      // Check for success and return the parsed model
+      if (data['success'] == true) {
+        return ToggleSaveResponse.fromJson(data);
+      } else {
+        throw Exception(data['message'] ?? 'Failed to toggle save status');
+      }
+    } on DioException catch (e) {
+      debugPrint("API Error toggling save status for bit $bitId: $e");
+      throw Exception(_handleError(e));
+    } catch (e) {
+      debugPrint("Unexpected error toggling save status for bit $bitId: $e");
+      rethrow;
+    }
+  }
+
+  Future<int> toggleLike(String bitId) async {
+    try {
+      final response = await _dio.post("/bits/$bitId/toggleLike");
+      final data = _decodeResponse(response.data);
+      if (data['success'] == true && data.containsKey('likeCount')) {
+        debugPrint("Successfully toggled like for bit: $bitId. New count: ${data['likeCount']}");
+        return data['likeCount'] as int;
+      } else {
+        throw Exception(data['message'] ?? 'Failed to toggle like status');
+      }
+    } on DioException catch (e) {
+      debugPrint("API Error toggling like for bit $bitId: ${e.response?.data}");
+      throw Exception(_handleError(e));
+    } catch (e) {
+      debugPrint("Unexpected error toggling like for bit $bitId: $e");
+      rethrow;
+    }
+  }
+  Future<int> toggleLikeProduct(String productId) async {
+    try {
+      final response = await _dio.post("/product/$productId/like");
+      final data = _decodeResponse(response.data);
+      if (data['success'] == true && data.containsKey('likeCount')) {
+        debugPrint("Successfully toggled like for product: $productId. New count: ${data['likeCount']}");
+        return data['likeCount'] as int;
+      } else {
+        throw Exception(data['message'] ?? 'Failed to toggle product like status');
+      }
+    } on DioException catch (e) {
+      debugPrint("API Error toggling like for product $productId: ${e.response?.data}");
+      throw Exception(_handleError(e));
+    } catch (e) {
+      debugPrint("Unexpected error toggling like for product $productId: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> saveProduct(String productId) async {
+    try {
+      await _dio.post("/product/$productId/save");
+      debugPrint("Successfully saved product: $productId");
+    } on DioException catch (e) {
+      debugPrint("API Error saving product $productId: $e");
+      throw Exception(_handleError(e));
+    } catch (e) {
+      debugPrint("Unexpected error saving product $productId: $e");
+      rethrow;
     }
   }
 

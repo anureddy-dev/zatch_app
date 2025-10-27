@@ -214,44 +214,9 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Contact Details',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 14,
-                        fontFamily: 'Encode Sans',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 18.0),
-                      child: const Text(
-                        'Email',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 12,
-                          fontFamily: 'Encode Sans',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _contactDetailsField(
-                      initialValue: "anureddy.kv@example.com",
-                      onEdit: () {
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AccountDetailsScreen(userProfile: userProfile),
-                          ),
-                        );
-                      },
-                    ),
+                    _contactDetailsSection(),
                     const SizedBox(height: 36),
                   ],
-
                   const Text(
                     'Select Location',
                     style: TextStyle(
@@ -273,17 +238,25 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
                         isSelected: selectedAddressIndex == index,
                         onTap:
                             () => setState(() => selectedAddressIndex = index),
-                        onEdit: () {
-                          Navigator.push(
+                        onEdit: () async {
+                          final updatedAddress = await Navigator.push<Address>(
                             context,
                             MaterialPageRoute(
-                              builder:
-                                  (_) => AddNewAddressScreen(
+                              builder: (_) => AddNewAddressScreen(
                                 addressToEdit: address,
                               ),
                             ),
                           );
+                          if (updatedAddress != null) {
+                            setState(() {
+                              final index = _addresses.indexWhere((a) => a.id == updatedAddress.id);
+                              if (index != -1) {
+                                _addresses[index] = updatedAddress;
+                              }
+                            });
+                          }
                         },
+
                         onRemove: () {
                           setState(() {
                             _addresses.removeAt(index);
@@ -391,8 +364,6 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
       ),
     );
   }
-
-  // --- WIDGETS ---
 
   Widget _buildCouponSection() {
     bool isApplied = appliedCoupon != null;
@@ -683,40 +654,83 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
     );
   }
 
-  Widget _contactDetailsField({
-    required String initialValue,
-    required VoidCallback onEdit,
-  }) {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.only(left: 24, right: 15),
-      decoration: ShapeDecoration(
-        color: const Color(0xFFF2F4F5),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(70)),
+  Widget _contactDetailsSection() {
+    final email = userProfile?.user.email ?? 'd.v.a.v.raju@gmail.com';
+    final phone = userProfile?.user.phone ?? '+91 9966127833';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+      const Text(
+      'Contact Details',
+      style: TextStyle(
+        color: Colors.black,
+        fontSize: 14,
+        fontFamily: 'Encode Sans',
+        fontWeight: FontWeight.w600,
+        height: 1.14,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            initialValue,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF616161),
-              fontSize: 16,
-              fontFamily: 'Encode Sans',
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          TextButton(
-            onPressed: onEdit,
-            child: const Text(
-              "Edit",
-              style: TextStyle(color: Color(0xFF8B0000)),
-            ),
-          ),
-        ],
+    ),
+    const SizedBox(height: 16),
+    Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    clipBehavior: Clip.antiAlias,
+    decoration: ShapeDecoration(
+    color: const Color(0xFFF2F2F2),
+    shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(20),
+    ),
+    ),
+    child: Column(
+    mainAxisSize: MainAxisSize.min,
+    mainAxisAlignment: MainAxisAlignment.start,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+    const Text(
+    'Email',
+    style: TextStyle(
+    color: Color(0xFFABABAB),
+    fontSize: 14,
+    fontFamily: 'Encode Sans',
+    fontWeight: FontWeight.w500,
+    height: 1.71,
+    ),
+    ),
+    const SizedBox(height: 6),
+     Text(
+   email ?? 'd.v.a.v.raju@gmail.com',
+    style: TextStyle(
+    color: Color(0xFF121111),
+    fontSize: 14,
+    fontFamily: 'Encode Sans',
+    fontWeight: FontWeight.w500,
+    ),
+    ),const SizedBox(height: 16),
+      const Text(
+        'Phone Number',
+        style: TextStyle(
+          color: Color(0xFFABABAB),
+          fontSize: 14,
+          fontFamily: 'Encode Sans',
+          fontWeight: FontWeight.w500,
+          height: 1.71,
+        ),
       ),
+      const SizedBox(height: 6),
+       Text(
+       phone?? '+91 9966127833',
+        style: TextStyle(
+          color: Color(0xFF121111),
+          fontSize: 14,
+          fontFamily: 'Encode Sans',
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    ],
+    ),
+    ),
+      ],
     );
   }
 
@@ -837,7 +851,7 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${address.fullAddress}\n${address.phone}',
+                      '${address.fullAddress},${address.phone}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

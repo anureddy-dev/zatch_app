@@ -55,6 +55,7 @@ dependencies:
   another_flushbar:
   image_picker:
   geocoding:
+  video_thumbnail:
 dev_dependencies:
   flutter_test:
     sdk: flutter

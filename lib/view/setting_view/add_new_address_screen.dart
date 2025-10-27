@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter/material.dart';import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 
 class Address {
   String id;
@@ -18,7 +17,6 @@ class Address {
     required this.icon,
   });
 }
-
 
 class AddNewAddressScreen extends StatefulWidget {
   final Address? addressToEdit;
@@ -39,9 +37,11 @@ class _AddNewAddressScreenState extends State<AddNewAddressScreen> {
   final TextEditingController pinCodeController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
 
+  String? selectedAddressType;
   String? selectedState;
   bool _isLocating = false;
 
+  final List<String> addressTypes = ["Home", "Office", "Others"];
   final List<String> indianStates = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
     "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
@@ -57,13 +57,21 @@ class _AddNewAddressScreenState extends State<AddNewAddressScreen> {
     super.initState();
     if (widget.addressToEdit != null) {
       final address = widget.addressToEdit!;
-      labelController.text = address.title;
+
+      // Set the address type dropdown and label controller
+      if (addressTypes.contains(address.title)) {
+        selectedAddressType = address.title;
+        labelController.text = address.title; // Pre-fill for validation
+      } else {
+        selectedAddressType = "Others";
+        labelController.text = address.title; // This is the custom label
+      }
+
       phoneController.text = address.phone.replaceAll('+91 ', '').trim();
 
-      // A more robust way to parse the address string
       final addressParts = address.fullAddress.split(',').map((s) => s.trim()).toList();
       if (addressParts.length >= 3) {
-        address1Controller.text = addressParts.length > 0 ? addressParts[0] : '';
+        address1Controller.text = addressParts.isNotEmpty ? addressParts[0] : '';
         address2Controller.text = addressParts.length > 1 ? addressParts[1] : '';
         cityController.text = addressParts.length > 2 ? addressParts[2] : '';
         if (addressParts.length > 3) {
@@ -124,7 +132,7 @@ class _AddNewAddressScreenState extends State<AddNewAddressScreen> {
       if (placemarks.isNotEmpty) {
         final placemark = placemarks[0];
         setState(() {
-          address1Controller.text = '${placemark.name}, ${placemark.thoroughfare}';
+          address1Controller.text = '${placemark.street}, ${placemark.thoroughfare}';
           address2Controller.text = placemark.subLocality ?? '';
           cityController.text = placemark.locality ?? '';
           pinCodeController.text = placemark.postalCode ?? '';
@@ -148,6 +156,8 @@ class _AddNewAddressScreenState extends State<AddNewAddressScreen> {
 
   void _saveOrUpdateAddress() {
     if (_formKey.currentState!.validate()) {
+      // The labelController is now the single source of truth for the title.
+      // It's either set by the dropdown or the custom text field.
       final fullAddress = [
         address1Controller.text.trim(),
         address2Controller.text.trim(),
@@ -239,14 +249,43 @@ class _AddNewAddressScreenState extends State<AddNewAddressScreen> {
                     Text(isEditing ? 'Update Address Details' : 'Or, Add Address Details Manually', style: const TextStyle(color: Colors.black, fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
                     const SizedBox(height: 20),
 
-                    _CustomTextField(
-                      controller: labelController,
-                      labelText: 'Label (e.g. Home, Office)',
-                      hintText: 'Enter a label for this address',
-                      maxLength: 20,
-                      validator: (value) => value == null || value.isEmpty ? 'Please enter a label' : null,
+                    _CustomDropdown(
+                      value: selectedAddressType,
+                      labelText: 'Address Type',
+                      hint: 'Select Address Type',
+                      items: addressTypes,
+                      onChanged: (value) {
+                        setState(() {
+                          selectedAddressType = value;
+                          if (value != "Others") {
+                            labelController.text = value ?? '';
+                          } else {
+                            labelController.clear();
+                          }
+                        });
+                      },
+                      validator: (value) => value == null ? 'Please select a type' : null,
                     ),
                     const SizedBox(height: 16),
+
+                    if (selectedAddressType == "Others")
+                      Column(
+                        children: [
+                          _CustomTextField(
+                            controller: labelController,
+                            labelText: 'Custom Label',
+                            hintText: 'Enter a custom label',
+                            maxLength: 20,
+                            validator: (value) {
+                              if (selectedAddressType == "Others" && (value == null || value.isEmpty)) {
+                                return 'Please enter a custom label';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
 
                     _CustomTextField(
                       controller: address1Controller,
@@ -312,6 +351,7 @@ class _AddNewAddressScreenState extends State<AddNewAddressScreen> {
                       hintText: '10-digit number',
                       keyboardType: TextInputType.phone,
                       prefixText: '+91',
+                      maxLength: 10,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (value) {
                         if (value == null || value.isEmpty) return 'Phone number is required';

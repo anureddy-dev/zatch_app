@@ -90,6 +90,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ),
 
           const SizedBox(height: 16),
+/*
 
           // ✅ DEBUG RESPONSE SECTION
           if (rawResponseText != null) ...[
@@ -122,6 +123,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             ),
             const SizedBox(height: 16),
           ],
+*/
 
           // ✅ SETTINGS CARD SECTION
           _settingsContainer(),
@@ -147,8 +149,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       ),
       child: Column(
         children: [
-          _settingsTile(Icons.account_circle, "Account Details", () {
-            Navigator.push(
+          // In the _settingsContainer method:
+
+          _settingsTile(Icons.account_circle, "Account Details", () async {
+            // ✅ ADD THIS PRINT STATEMENT
+            print("--- Tapped 'Account Details'. Navigating to screen. No API call is made yet. ---");
+
+            final result = await Navigator.push<bool>(
               context,
               MaterialPageRoute(
                 builder: (_) => AccountDetailsScreen(
@@ -156,7 +163,15 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 ),
               ),
             );
+            if (result == true) {
+              print("✅ Navigated back from AccountDetailsScreen with success. Refreshing profile...");
+              fetchUserProfile(); // API call happens HERE
+            } else {
+              // ✅ ADD THIS FOR CLARITY
+              print("--- Navigated back from AccountDetailsScreen without success signal. No refresh needed. ---");
+            }
           }),
+
           _settingsTile(Icons.shopping_cart, "Your Orders", () {
             Navigator.push(
               context,

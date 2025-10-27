@@ -7,6 +7,7 @@ import 'package:zatch_app/sellersscreens/SellHomeScreen.dart';
 import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/search_view/search_screen.dart';
 import 'package:zatch_app/view/setting_view/account_setting_screen.dart';
+import 'package:zatch_app/view/zatch_ai_screen.dart';
 import '../Widget/Header.dart';
 import '../Widget/bargain_picks_widget.dart';
 import '../Widget/followers_widget.dart';
@@ -29,6 +30,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   final ApiService _apiService = ApiService();
   UserProfileResponse? userProfile;
+  List<Category> _allCategories = [];
   bool isLoading = true;
   String? error;
 
@@ -42,6 +44,14 @@ class _HomePageState extends State<HomePage> {
       // The logic for _showAccountDetails is removed as it's better handled within AccountSettingsScreen
     });
   }
+  void _openZatchAi() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Allows the sheet to be taller than half the screen
+      backgroundColor: Colors.transparent, // Makes container's rounded corners visible
+      builder: (context) => const ZatchAiScreen(),
+    );
+  }
 
   @override
   void initState() {
@@ -49,7 +59,25 @@ class _HomePageState extends State<HomePage> {
     if (mounted) {
       _apiService.init().then((_) {
         fetchUserProfile();
+        _fetchAllCategories();
       });
+    }
+  }
+  Future<void> _fetchAllCategories() async {
+    try {
+      final fetched = await _apiService.getCategories();
+      if (mounted) {
+        setState(() {
+          final exploreAllCategory = Category(
+            id: "0",
+            easyname: 'Explore All', name: 'Explore All',
+          );
+          _allCategories = [exploreAllCategory, ...fetched];
+          _selectedCategory = _allCategories.first;
+        });
+      }
+    } catch (e) {
+      print("Failed to fetch all categories: $e");
     }
   }
 
@@ -83,12 +111,12 @@ class _HomePageState extends State<HomePage> {
    if (_selectedCategory == null || _selectedCategory!.name.toLowerCase() == 'explore all') {
       return Column(
         children: [
-          LiveFollowersWidget(),
+          const LiveFollowersWidget(),
           const BargainPicksWidget(),
           const FollowersWidget(),
           const TopPicksThisWeekWidget(),
           const TrendingSection(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 40),
         ],
       );
     }
@@ -148,9 +176,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 16),
                 CategoryTabsWidget(
                   selectedCategories:
-                      widget.selectedCategories?.isNotEmpty == true
-                          ? widget.selectedCategories
-                          : null,
+    _allCategories,
                   onCategorySelected: (category) {
                     setState(() {
                       _selectedCategory = category;
@@ -200,8 +226,7 @@ class _HomePageState extends State<HomePage> {
           userProfile: userProfile,
         ),
         floatingActionButton: FloatingZButton(
-          onPressed: () {
-          },
+            onPressed: _openZatchAi,
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),

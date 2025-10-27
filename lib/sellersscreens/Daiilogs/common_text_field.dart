@@ -1,40 +1,32 @@
 import 'package:flutter/material.dart';
 
-class CommonTextField extends StatelessWidget {
-  final String label;
-  final String hint;
-  final TextEditingController controller;
-  const CommonTextField({
+class CancelRegistrationModal extends StatelessWidget {
+  /// Callback for the "Don't Save" button.
+  final VoidCallback? onDontSave;
+
+  /// Callback for the "Save To Draft" button.
+  final VoidCallback? onSaveToDraft;
+
+  /// Callback for the "Continue" button.
+  final VoidCallback? onContinue;
+
+  const CancelRegistrationModal({
     Key? key,
-    required this.label,
-    required this.hint,
-    required this.controller,
+    this.onDontSave,
+    this.onSaveToDraft,
+    this.onContinue,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-}
-class CancelRegistrationModal extends StatelessWidget {
-  const CancelRegistrationModal({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-   return Dialog(
+    return Dialog(
       backgroundColor: Colors.transparent, // Make the default dialog background transparent
       elevation: 0,
       child: _buildModalContent(context),
     );
   }
-Widget _buildModalContent(BuildContext context) {
+
+  Widget _buildModalContent(BuildContext context) {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -79,19 +71,21 @@ Widget _buildModalContent(BuildContext context) {
             padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
             child: Column(
               children: [
-                // "Don't Save" Button (Refactored from "Cancel")
+                // "Don't Save" Button
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 59),
                     side: const BorderSide(width: 1, color: Colors.black),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   ),
-                  onPressed: () {
-                     int count = 0;
-                    Navigator.of(context).popUntil((_) => count++ >= 2);
-                  },
+                  onPressed: onDontSave ??
+                          () {
+                        // Default behavior: Pop two pages
+                        int count = 0;
+                        Navigator.of(context).popUntil((_) => count++ >= 2);
+                      },
                   child: const Text(
-                    "Don't Save", // Renamed for clarity
+                    "Don't Save",
                     style: TextStyle(
                       color: Colors.black,
                       fontSize: 16,
@@ -109,11 +103,12 @@ Widget _buildModalContent(BuildContext context) {
                     side: const BorderSide(width: 1, color: Colors.black),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   ),
-                  onPressed: () {
-                    // Implement save to draft logic here
-                    print("Saving to draft...");
-                    Navigator.of(context).pop(); // Close the dialog
-                  },
+                  onPressed: onSaveToDraft ??
+                          () {
+                        // Default behavior: Print a message and close the dialog
+                        print("Saving to draft...");
+                        Navigator.of(context).pop();
+                      },
                   child: const Text(
                     'Save To Draft',
                     style: TextStyle(
@@ -132,12 +127,13 @@ Widget _buildModalContent(BuildContext context) {
                     backgroundColor: const Color(0xFFA2DC00),
                     minimumSize: const Size(double.infinity, 56),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    elevation: 0, // Remove default elevation if shadows are in the parent
+                    elevation: 0,
                   ),
-                  onPressed: () {
-                    // Close the modal and continue with the registration
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: onContinue ??
+                          () {
+                        // Default behavior: Just close the dialog
+                        Navigator.of(context).pop();
+                      },
                   child: const Text(
                     'Continue',
                     style: TextStyle(

@@ -98,16 +98,75 @@ class _TrendingSectionState extends State<TrendingSection> {
   }
 }
 
-class TrendingCard extends StatelessWidget {
-  final TrendingBit bit;
+class TrendingCard extends StatefulWidget {
+  final TrendingBit bit;  const TrendingCard({super.key, required this.bit});
 
-  const TrendingCard({super.key, required this.bit});
+  @override
+  State<TrendingCard> createState() => _TrendingCardState();
+}
 
+class _TrendingCardState extends State<TrendingCard> {
+  late bool isLiked;
+  late int likeCount;
+  bool isApiCallInProgress = false;
+  final ApiService _api = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    likeCount = widget.bit.likeCount;
+    isLiked = likeCount > 0;
+  }
+
+  Future<void> _toggleLike() async {
+    if (isApiCallInProgress) return;
+
+    setState(() {
+      isApiCallInProgress = true;
+      isLiked = !isLiked;
+      if (isLiked) {
+        likeCount++;
+      } else {
+        likeCount--;
+      }
+    });
+
+    try {
+      final newServerLikeCount = await _api.toggleLike(widget.bit.id);
+      widget.bit.likeCount = newServerLikeCount;
+      setState(() {
+        likeCount = newServerLikeCount;
+        isLiked = newServerLikeCount > 0;
+      });
+
+    } catch (e) {
+      setState(() {
+        isLiked = !isLiked;
+        if (isLiked) {
+          likeCount++;
+        } else {
+          likeCount--;
+        }
+      });
+      debugPrint("Failed to toggle like: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Action failed. Please try again."), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isApiCallInProgress = false;
+        });
+      }
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        if (bit.isLive == true) {
+        if (widget.bit.isLive == true) {
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -120,7 +179,7 @@ class TrendingCard extends StatelessWidget {
             context,
             MaterialPageRoute(
                 builder: (_) =>
-                    ReelDetailsScreen(bitId: bit.id ?? '', controller: LiveStreamController())), // use actual id
+                    ReelDetailsScreen(bitId:widget.bit.id ?? '', controller: LiveStreamController())), // use actual id
           );
         }
       },
@@ -144,7 +203,7 @@ class TrendingCard extends StatelessWidget {
               Stack(
                 children: [
                   Image.network(
-                    bit.thumbnailUrl,
+                    widget.bit.thumbnailUrl,
                     height: 200,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -156,7 +215,7 @@ class TrendingCard extends StatelessWidget {
                       );
                     },
                   ),
-                  if (bit.isLive == true)
+                  if (widget.bit.isLive == true)
                     Positioned(
                       top: 8,
                       left: 8,
@@ -179,11 +238,24 @@ class TrendingCard extends StatelessWidget {
                   Positioned(
                     top: 8,
                     right: 8,
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Colors.black.withOpacity(0.6),
-                      child: const Icon(Icons.favorite_border,
-                          color: Colors.white, size: 16),
+                    child: GestureDetector(
+                      onTap: _toggleLike,
+                      child: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: Colors.black.withOpacity(0.6),
+                        child: isApiCallInProgress
+                            ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                            : Icon(
+                          // The icon is determined by the 'isLiked' state variable
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: isLiked ? Colors.red : Colors.white,
+                          size: 16,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -194,7 +266,7 @@ class TrendingCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      bit.title ?? 'Untitled',
+                      widget.bit.title ?? 'Untitled',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -204,7 +276,7 @@ class TrendingCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      bit.description ?? 'No category',
+                      widget.bit.description ?? 'No category',
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w400,
@@ -217,7 +289,7 @@ class TrendingCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '\$${bit.viewCount ?? 'N/A'}',
+                          '\$${widget.bit.viewCount ?? 'N/A'}',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -230,7 +302,7 @@ class TrendingCard extends StatelessWidget {
                                 size: 16, color: Colors.amber),
                             const SizedBox(width: 2),
                             Text(
-                              bit.likeCount?.toString() ?? '0.0',
+                              widget.bit.viewCount?.toString() ?? '0.0',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w400,

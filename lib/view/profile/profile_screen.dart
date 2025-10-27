@@ -1,10 +1,15 @@
 import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:zatch_app/controller/live_stream_controller.dart';
 import 'package:zatch_app/model/carts_model.dart';
+import 'package:zatch_app/model/live_session_res.dart';
 import 'package:zatch_app/model/user_profile_model.dart';
 import 'package:zatch_app/services/api_service.dart';
+import 'package:zatch_app/view/LiveDetailsScreen.dart';
+import 'package:zatch_app/view/ReelDetailsScreen.dart';
 import 'package:zatch_app/view/product_view/product_detail_screen.dart';
 import 'package:zatch_app/view/zatching_details_screen.dart';
 
@@ -26,7 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isFollowing = false;
   bool _isSharing = false;
   bool _isFollowLoading = false;
-   late Zatch zatch;
+  // late Zatch zatch; // This was unused and has been removed.
 
   @override
   void initState() {
@@ -34,6 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     _tabController = TabController(length: _tabs.length, vsync: this);
     _fetchUserProfile();
   }
+
   void _showMessage(String title, String message, {bool isError = false}) {
     if (!mounted) return;
     Flushbar(
@@ -54,21 +60,27 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _fetchUserProfile() async {
     if (widget.userId == null) {
-      debugPrint("⚠️ No userId provided for ProfileScreen");
-      setState(() => _isLoading = false);
-      return;
+      debugPrint(" No userId provided for ProfileScreen");
+      if (mounted) setState(() => _isLoading = false);      return;
     }
-    debugPrint("❌ Error fetching profile: ${widget.userId!}");
+    if (_userProfile == null) {
+      if (mounted) setState(() => _isLoading = true);
+    }
+
+    debugPrint("Fetching profile for userId: ${widget.userId!}");
 
     try {
       final profile = await ApiService().getUserProfileById(widget.userId!);
+
+      debugPrint("Success! Profile data received: ${profile.toString()}");
       setState(() {
         _userProfile = profile;
         _isFollowing = profile.followers.isNotEmpty;
         _isLoading = false;
       });
-    } catch (e) {
-      debugPrint("❌ Error fetching profile: $e");
+    } catch (e, stackTrace) {
+      debugPrint("Error fetching profile: $e");
+      debugPrint(stackTrace.toString());
       setState(() => _isLoading = false);
     }
   }
@@ -79,7 +91,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     try {
       final res = await ApiService().toggleFollowUser(widget.userId!);
-
+      await _fetchUserProfile();
       setState(() {
         _isFollowing = !_isFollowing;
         _isFollowLoading = false;
@@ -88,35 +100,18 @@ class _ProfileScreenState extends State<ProfileScreen>
       final message = _isFollowing
           ? "You are now following ${_userProfile?.username ?? 'this user'}"
           : "You unfollowed ${_userProfile?.username ?? 'this user'}";
-      _showMessage(_isFollowing ? "Followed" : "Unfollowed", message);
-
+    //  _showMessage(_isFollowing ? "Followed" : "Unfollowed", message);
     } catch (e) {
       setState(() => _isFollowLoading = false);
     }
   }
-
-
   Future<void> _onSharePressed() async {
-    if (widget.userId == null) return;
-    setState(() => _isSharing = true);
-
-    try {
-      final res = await ApiService().shareUserProfile(widget.userId!);
-      setState(() => _isSharing = false);
-
-      if (res.profileData != null) {
-        await Share.share("Check out this Zatch profile: ${res.profileData}");
-      } else {
-        _showMessage("Share Failed", "No share link available.", isError: true);
-      }
-    } catch (e) {
-      setState(() => _isSharing = false);
-    }
+    if (_userProfile == null) return;
+    // Create a shareable link. Replace with your actual app's URL structure.
+    final shareLink = "https://zatch.app/profile/${_userProfile!.id}";
+    await Share.share(
+        "Check out ${_userProfile!.username ?? 'this user'}'s profile on Zatch!\n$shareLink");
   }
-
-  /*void _onMessagePressed() {
-    _showMessage("Coming Soon", "The message feature is not available yet.");
-  }*/
 
   @override
   void dispose() {
@@ -173,9 +168,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                       child: TabBarView(
                         controller: _tabController,
                         children: [
-                          _buildGalleryView(user),
+                          _buildBitsView(user),
                           _buildShopView(user),
-                          _buildLiveView(),
+                          _buildLiveView(user),
                         ],
                       ),
                     ),
@@ -205,9 +200,11 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             child: CircleAvatar(
               radius: 50,
-              backgroundImage: user.profilePicUrl != null
+              backgroundImage: user.profilePicUrl != null && user.profilePicUrl!.isNotEmpty
                   ? NetworkImage(user.profilePicUrl!)
                   : const NetworkImage("https://via.placeholder.com/150"),
+              // Handles cases where the image URL is invalid
+              onBackgroundImageError: (_, __) {},
             ),
           ),
           const SizedBox(height: 8),
@@ -260,7 +257,8 @@ class _ProfileScreenState extends State<ProfileScreen>
             backgroundColor: Colors.grey.shade200,
             child: IconButton(
               icon: const Icon(Icons.chat_bubble_outline, color: Colors.black54),
-              onPressed: (){
+              onPressed: () {
+                // This navigation is hardcoded. It should ideally use dynamic data from the user profile.
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -282,13 +280,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ),
                 );
-                  },
+              },
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor:
-              _isFollowing ? Colors.grey.shade300 : const Color(0xFFCCF656),
+              _isFollowing ? Color(0xFFCCF656) : const Color(0xFFCCF656),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30)),
               padding:
@@ -364,18 +362,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildGalleryView(UserProfile user) {
-    final gallery = user.sellingProducts
-        .map<String>((e) => e['image']?['url'] ?? '')
-        .where((url) => url.isNotEmpty)
-        .toList();
 
-    if (gallery.isEmpty) {
+  /// TAB 1: Buy Bits (Saved Bits)
+  Widget _buildBitsView(UserProfile user) {
+    final bits = user.savedBits;
+
+    if (bits.isEmpty) {
       return const Center(
-        child: Text(
-          "No items to display yet!",
-          style: TextStyle(color: Colors.grey),
-        ),
+        child: Text("No saved bits yet!", style: TextStyle(color: Colors.grey)),
       );
     }
 
@@ -385,19 +379,59 @@ class _ProfileScreenState extends State<ProfileScreen>
         crossAxisCount: 2,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        itemCount: gallery.length,
+        itemCount: bits.length,
         itemBuilder: (context, index) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.network(gallery[index], fit: BoxFit.cover),
+          final bit = bits[index];
+          return GestureDetector(
+            onTap: (){
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReelDetailsScreen(
+                    bitId: bit.id, // bit.id is not nullable in the corrected model
+                    controller: LiveStreamController(),
+                  ),
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: AspectRatio(
+                aspectRatio: 9 / 16, // Common aspect ratio for video shorts
+                child: Container(
+                  color: Colors.black,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      const Center(
+                        child: Icon(Icons.play_circle_fill, color: Colors.white54, size: 40),
+                      ),
+                      // Gradient overlay to make text readable
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black87],
+                            stops: [0.6, 1.0],
+                          ),
+                        ),
+                      ),
+
+                    ],
+                  ),
+                ),
+              ),
+            ),
           );
         },
       ),
     );
   }
-
+  /// TAB 2: Shop (Selling Products)
   Widget _buildShopView(UserProfile user) {
-    final products = user.sellingProducts;
+    // This list correctly contains SavedProduct objects.
+    final products = user.savedProducts;
 
     if (products.isEmpty) {
       return const Center(
@@ -415,71 +449,328 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {
-        final product = products[index];
-        final img = product['image']?['url'] ?? '';
-        final title = product['name'] ?? 'Unnamed Product';
-        final priceValue = product['price'];
-        final price = priceValue is num
-            ? '₹ ${priceValue.toStringAsFixed(2)}'
-            : '₹ ${priceValue?.toString() ?? '0.00'}';
+        // Get the SavedProduct object.
+        final SavedProduct productItem = products[index];
+        // Pass the object directly to the card.
         return _ProductCard(
-          imageUrl: img,
-          title: title,
-          price: price,
-          onTap: () {
-            final productId = product['_id'] as String?;
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductDetailScreen( productId: productId ?? ''),
-              ),
-            );            debugPrint("Tapped on product: $title");
-          },
-          onIconTap: () {
-            debugPrint("Icon tapped for product: $title");
-          },
+          product: productItem,
         );
       },
     );
   }
-} // End of _ProfileScreenState class
 
-// --- NEW WIDGET: Reusable Product Card based on Figma Design ---
-class _ProductCard extends StatelessWidget {
-  final String imageUrl;
-  final String title;
-  final String price;
-  final VoidCallback onTap;
-  final VoidCallback onIconTap;
+  /// TAB 3: Upcoming Live
+  Widget _buildLiveView(UserProfile user) {
+    final liveEvents = user.upcomingLives;if (liveEvents.isEmpty) {
+      return const Center(
+        child: Text("No live events scheduled yet!", style: TextStyle(color: Colors.grey)),
+      );
+    }
 
-  const _ProductCard({
-    required this.imageUrl,
-    required this.title,
-    required this.price,
-    required this.onTap,
-    required this.onIconTap,
-  });
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,        // Two columns
+        mainAxisSpacing: 24,      // Vertical spacing between cards
+        crossAxisSpacing: 16,     // Horizontal spacing between cards
+        childAspectRatio: 179 / 300, // Aspect ratio from Figma design (width / (image_height + text_height))
+      ),
+      itemCount: liveEvents.length,
+      itemBuilder: (context, index) {
+        final event = liveEvents[index];
+        // The GestureDetector for navigation now wraps the stateful _LiveEventCard.
+        // The onTap for the card itself remains unchanged.
+        return GestureDetector(
+          onTap: () {
+            final session = Session(
+              id: event.id,
+              title: event.title,
+              status: event.scheduledStartTime.toIso8601String(),
+              viewersCount: 0,
+              scheduledStartTime: event.scheduledStartTime.toIso8601String(),
+            );
+
+            final liveController = LiveStreamController(session: session);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => LiveStreamScreen(controller: liveController, username: user.username),
+              ),
+            );
+          },
+          child: _LiveEventCard(event: event),
+        );
+      },
+    );
+  }
+}
+class _LiveEventCard extends StatefulWidget {
+  final UpcomingLive event;
+
+  const _LiveEventCard({required this.event});
+
+  @override
+  State<_LiveEventCard> createState() => _LiveEventCardState();
+}
+
+class _LiveEventCardState extends State<_LiveEventCard> {
+  late bool isLiked;
+  bool isApiCallInProgress = false;
+  final ApiService _api = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+   isLiked = false;
+  }
+
+  Future<void> _toggleLike() async {
+    if (isApiCallInProgress) return;
+
+    setState(() {
+      isApiCallInProgress = true;
+      isLiked = !isLiked;
+    });
+
+    try {
+      await _api.toggleLike(widget.event.id);
+    } catch (e) {
+      debugPrint("Failed to toggle live event like: $e");
+      setState(() {
+        isLiked = !isLiked;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Action failed. Please try again."),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isApiCallInProgress = false;
+        });
+      }
+    }
+  }
+
+  String _getDateLabel(DateTime eventTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final eventDay = DateTime(eventTime.year, eventTime.month, eventTime.day);
+
+    if (eventDay == today) {
+      return 'Today';
+    } else if (eventDay.difference(today).inDays == 1) {
+      return 'Tomorrow';
+    } else {
+      return DateFormat.MMMd().format(eventTime);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Access event via widget.event in a StatefulWidget
+    final formattedTime = DateFormat('h.mm a').format(widget.event.scheduledStartTime);
+    final dateLabel = _getDateLabel(widget.event.scheduledStartTime);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(
+                  "https://picsum.photos/seed/${widget.event.id}/200/300",
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                  const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)),
+                ),
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(48),
+                    ),
+                    child: Text(
+                      '$dateLabel ${formattedTime.toUpperCase()}',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 12,
+                        fontFamily: 'Encode Sans',
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 4. Updated the favorite icon to be interactive.
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: GestureDetector(
+                    onTap: _toggleLike, // Call the like function on tap
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF292526).withOpacity(0.8),
+                        shape: BoxShape.circle,
+                      ),
+                      // Display a loader or an icon based on the state
+                      child: isApiCallInProgress
+                          ? const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                          : Icon(
+                        isLiked ? Icons.favorite : Icons.favorite_border,
+                        color: isLiked ? Colors.red : Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.event.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 14,
+                  fontFamily: 'Encode Sans',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Live Show',
+                style: TextStyle(
+                  color: Color(0xFF787676),
+                  fontSize: 10,
+                  fontFamily: 'Encode Sans',
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+class _ProductCard extends StatefulWidget {
+  // Changed from Map<String, dynamic> to SavedProduct
+  final SavedProduct product;
+
+  const _ProductCard({required this.product});
+
+  @override
+  State<_ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<_ProductCard> {
+  late bool isLiked;
+  bool isApiCallInProgress = false;
+  final ApiService _api = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    // API response doesn't seem to include 'isLiked' for saved products,
+    // so we initialize it to a default value (e.g., false or true if they are saved).
+    // Let's assume saved means liked for this example.
+    isLiked = true;
+  }
+
+  Future<void> _toggleLike() async {
+    // Use the product's id directly from the object.
+    final productId = widget.product.id;
+    if (isApiCallInProgress) return;
+
+    setState(() {
+      isApiCallInProgress = true;
+      isLiked = !isLiked;
+    });
+
+    try {
+      // This call will add/remove the product from the user's saved list.
+      await _api.toggleLikeProduct(productId);
+    } catch (e) {
+      debugPrint("Failed to toggle product like: $e");
+      // Revert state on failure
+      setState(() {
+        isLiked = !isLiked;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Action failed. Please try again."),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isApiCallInProgress = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Extract data directly from the SavedProduct object.
+    final product = widget.product;
+    final imageUrl = product.imageUrl ?? '';
+    final title = product.name;
+    final price = '₹ ${product.price.toStringAsFixed(2)}';
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductDetailScreen(productId: product.id),
+          ),
+        );
+      },
       child: Container(
-        // Main card container
         decoration: BoxDecoration(
-          color: const Color(0xFFF4F4F4), // Bg-Light-2 from Figma
+          color: const Color(0xFFF4F4F4),
           borderRadius: BorderRadius.circular(8),
         ),
-        clipBehavior: Clip.antiAlias, // Ensures children respect the border radius
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Image Section with Overlay Icon ---
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Product Image
                   Image.network(
                     imageUrl,
                     fit: BoxFit.cover,
@@ -487,12 +778,11 @@ class _ProductCard extends StatelessWidget {
                       child: Icon(Icons.image_not_supported, color: Colors.grey),
                     ),
                   ),
-                  // Icon Button Overlay
                   Positioned(
                     top: 5,
                     right: 5,
                     child: GestureDetector(
-                      onTap: onIconTap,
+                      onTap: _toggleLike,
                       child: Container(
                         width: 28,
                         height: 28,
@@ -500,9 +790,14 @@ class _ProductCard extends StatelessWidget {
                           color: Colors.white.withOpacity(0.85),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Icons.favorite_border, // Example Icon
-                          color: Colors.black,
+                        child: isApiCallInProgress
+                            ? const Padding(
+                          padding: EdgeInsets.all(7.0),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                        )
+                            : Icon(
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: isLiked ? Colors.red : Colors.black,
                           size: 16,
                         ),
                       ),
@@ -511,8 +806,6 @@ class _ProductCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // --- Text Section ---
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
               child: Text(
@@ -520,7 +813,7 @@ class _ProductCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF272727), // Black-100 from Figma
+                  color: Color(0xFF272727),
                   fontSize: 12,
                   fontFamily: 'Encode Sans',
                   fontWeight: FontWeight.w400,
@@ -532,7 +825,7 @@ class _ProductCard extends StatelessWidget {
               child: Text(
                 price,
                 style: const TextStyle(
-                  color: Color(0xFF272727), // Black-100 from Figma
+                  color: Color(0xFF272727),
                   fontSize: 12,
                   fontFamily: 'Encode Sans',
                   fontWeight: FontWeight.w700,
@@ -545,9 +838,6 @@ class _ProductCard extends StatelessWidget {
     );
   }
 }
-  Widget _buildLiveView() {
-    return const Center(child: Text("No live events available yet"));
-  }
 
 
 class _StatItem extends StatelessWidget {

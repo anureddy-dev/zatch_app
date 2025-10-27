@@ -61,7 +61,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
   }
 
   Future<void> _joinLiveSession() async {
-    final username = widget.controller.session?.host?.username;
+    final username = widget.username;
 
     if (username == null || username.isEmpty) return;
 

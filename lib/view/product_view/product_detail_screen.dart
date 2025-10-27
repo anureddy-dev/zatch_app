@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:zatch_app/Widget/bargain_picks_widget.dart';
 import 'package:zatch_app/Widget/top_picks_this_week_widget.dart';
+import 'package:zatch_app/model/carts_model.dart';
 import 'package:zatch_app/model/product_response.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/cart_screen.dart';
 import 'package:zatch_app/view/rate_order_dialog.dart';
 import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
+import 'package:zatch_app/view/zatching_details_screen.dart';
 
 import '../setting_view/profile_screen.dart';
 
@@ -129,6 +131,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   final _pageController = PageController();
   late final TabController _tabController;
+  final TextEditingController _commentController = TextEditingController();
   int _selectedSizeIndex = -1;
   int _selectedColorIndex = -1;
   final ApiService _apiService = ApiService();
@@ -602,7 +605,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   Widget _buildCommunityTab() {
     final bool canExpand = comments.length <= 10;
-    final displayCount = _showAllCommunity ? comments.length : (comments.length > 2 ? 2 : comments.length);
+    final displayCount =      _showAllCommunity ? comments.length : (comments.length > 2 ? 2 : comments.length);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(top: 16),
@@ -618,7 +621,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               return CommentWidget(comment: comments[index]);
             },
           ),
-          // CORRECTED LOGIC: Show "View all" if there are more than 2 comments and the list is not already expanded.
           if (comments.length > 2 && !_showAllCommunity)
             GestureDetector(
               onTap: () {
@@ -637,9 +639,57 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               },
               child: const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12.0),
-                child: Center(child: Text("View all", style: TextStyle(color: Colors.blue, fontSize: 14))),
+                child: Center(
+                    child: Text("View all",
+                        style: TextStyle(color: Colors.black, fontSize: 14))),
               ),
             ),
+          const SizedBox(height: 16), // Added spacing
+          // --- Start: New "Add Comments" TextField ---
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: SizedBox(
+              height: 52,
+              child: TextField(
+                controller: _commentController,
+                decoration: InputDecoration(
+                  hintText: 'Add Comments',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF899092),
+                    fontSize: 16,
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0.08,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF0F0F0),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20.23, vertical: 15),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(50),
+                    borderSide: BorderSide.none,
+                  ),
+                  suffixIcon: Padding(
+                    padding: const EdgeInsets.all(7.0),
+                    child: GestureDetector(
+                      onTap: () {
+                        // TODO: Implement comment submission logic here
+                        print("Comment submitted: ${_commentController.text}");
+                        _commentController.clear();
+                        // Hide keyboard
+                        FocusScope.of(context).unfocus();
+                      },
+                      child: const CircleAvatar(
+                        radius: 19,
+                        backgroundColor: Color(0xFFA2DC00),
+                        child: Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // --- End: New "Add Comments" TextField ---
         ],
       ),
     );
@@ -653,49 +703,37 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       padding: const EdgeInsets.only(top: 16),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: ElevatedButton.icon(
-              onPressed: () {
-                showReviewDialog(context, product);
-              },
-              icon: const Icon(Icons.rate_review_outlined,color: Colors.black,),
-              label: const Text("Add a Review",style: TextStyle(color: Colors.black),),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 40),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: displayCount,
             itemBuilder: (context, index) {
               final review = reviews[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(backgroundImage: NetworkImage(review.userAvatarUrl), radius: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: List.generate(5, (starIndex) =>
-                                Icon(starIndex < review.rating ? Icons.star : Icons.star_border, color: Colors.amber, size: 16)),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(review.comment, style: TextStyle(color: Colors.grey[700])),
-                        ],
+              return GestureDetector(onTap: (){},
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(backgroundImage: NetworkImage(review.userAvatarUrl), radius: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: List.generate(5, (starIndex) =>
+                                  Icon(starIndex < review.rating ? Icons.star : Icons.star_border, color: Colors.amber, size: 16)),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(review.comment, style: TextStyle(color: Colors.grey[700])),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
@@ -704,11 +742,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           if (reviews.length > 2 && !_showAllReviews)
             GestureDetector(
               onTap: () {
-                // If the total count is 10 or less, expand in place.
                 if (canExpand) {
                   setState(() => _showAllReviews = true);
                 } else {
-                  // Otherwise, navigate to the new screen.
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => AllReviewsScreen(reviews: reviews)),
@@ -720,7 +756,48 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                 child: Center(child: Text("View all", style: TextStyle(color: Colors.blue))),
               ),
             ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: GestureDetector(
+              onTap: () {
+                showReviewDialog(context, product);
+              },
+              child: Container(
+                width: double.infinity, // Make it take the full width
+                height: 52,
+                decoration: ShapeDecoration(
+                  color: const Color(0xFFF0F0F0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                ),
+                child: const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: 20.23,right: 20.23),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Add a Review',
+                          style: TextStyle(
+                            color: Color(0xFF899092),
+                            fontSize: 16,
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontWeight: FontWeight.w400,
+                            letterSpacing: 0.08,
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward_ios, size: 24, color: Color(0xFF899092)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
+
       ),
     );
   }
@@ -779,6 +856,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             child: OutlinedButton(
               // ✅ FIX: Zatch button is now clickable
               onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ZatchingDetailsScreen(
+                      zatch: Zatch(
+                        id: "temp1",
+                        name: product.name,
+                        description: product.category?.description ?? "",
+                        seller: "Seller Name", // optional
+                        imageUrl: product.images.first.url,
+                        active: true,
+                        status: "My Offer",
+                        quotePrice: "${product.price.toStringAsFixed(0)} ₹",
+                        sellerPrice: "${product.price}",
+                        quantity: 1,
+                        subTotal: "${(product.price * 1).toStringAsFixed(0)} ₹",
+                        date: DateTime.now().toString(),
+                      ),
+                    ),
+                  ),
+                );
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zatch button clicked!")));
               },
               style: OutlinedButton.styleFrom(

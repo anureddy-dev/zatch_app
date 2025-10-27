@@ -84,11 +84,10 @@ class _LoginScreenState extends State<LoginScreen> {
         print("Token saved in SharedPreferences: ${res.token}");
       }
 
-      final selectedCategories = prefs.getStringList("userCategories") ?? [];
-      print("Selected categories: $selectedCategories");
+      final savedCategories = prefs.getStringList("userCategories");
+      print("Selected categories: $savedCategories");
 
-      if (selectedCategories.isEmpty) {
-        print("Navigating to CategoryScreen");
+      if (savedCategories == null || savedCategories.isEmpty) {        print("Navigating to CategoryScreen");
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => CategoryScreen(loginResponse: res)),

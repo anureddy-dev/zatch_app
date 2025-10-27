@@ -5,7 +5,7 @@ class TrendingBit {
   final String videoUrl;
   final String thumbnailUrl;
   final String badge;
-  final int likeCount;
+   int likeCount;
   final int viewCount;
   final int shareCount;
   final String shareLink;
@@ -28,12 +28,19 @@ class TrendingBit {
   });
 
   factory TrendingBit.fromJson(Map<String, dynamic> json) {
+    String getUrl(String key) {
+      if (json.containsKey(key) && json[key] is Map) {
+        return json[key]['url'] ?? '';
+      }
+      return '';
+    }
+
     return TrendingBit(
       id: json['_id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      videoUrl: json['video']?['url'] ?? '',
-      thumbnailUrl: json['thumbnail']?['url'] ?? '',
+      title: json['title'] ?? 'Untitled',
+      description: json['description'] ?? '',
+      videoUrl: getUrl('video'),
+      thumbnailUrl: getUrl('thumbnail'),
       badge: json['badge'] ?? '',
       likeCount: json['likeCount'] ?? 0,
       viewCount: json['viewCount'] ?? 0,

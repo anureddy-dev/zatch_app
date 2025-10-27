@@ -3,7 +3,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/services/api_service.dart';
-import 'package:zatch_app/view/auth_view/login.dart';
 import 'change_info_screen.dart';
 import 'change_password_screen.dart';
 
@@ -21,6 +20,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   final ApiService _apiService = ApiService();
   final _formKey = GlobalKey<FormState>();
 
+  // Controllers are late-initialized but safely within initState.
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
@@ -34,62 +34,85 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
   late List<String> _days;
   final List<String> _months = const [
-    "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
   ];
   late List<String> _years;
 
   bool _isLoading = false;
   bool _isFormValid = false;
 
-  late UserProfileResponse _currentProfile;
+  // ✅ FIX: The profile state can be nullable.
+  UserProfileResponse? _currentProfile;
 
   @override
   void initState() {
     super.initState();
-    _currentProfile = widget.userProfile!;
 
-    final user = _currentProfile.user;
+    // ✅ FIX: Safely check for null before using the profile.
+    if (widget.userProfile == null) {
+      // If no profile is passed, we can't initialize the form.
+      // The build method will handle showing an error message.
+      _currentProfile = null;
+      _nameController = TextEditingController();
+      _phoneController = TextEditingController();
+      _emailController = TextEditingController();
+    } else {
+      // If the profile exists, proceed with initialization.
+      _currentProfile = widget.userProfile!;
+      final user = _currentProfile!.user;
 
-    _nameController = TextEditingController(text: user.username);
-    _phoneController = TextEditingController(text: user.phone);
-    _emailController = TextEditingController(text: user.email);
-    gender = user.gender;
-    _selectedCountryCode = user.countryCode ?? "+91";
+      _nameController = TextEditingController(text: user.username);
+      _phoneController = TextEditingController(text: user.phone);
+      _emailController = TextEditingController(text: user.email);
+      gender = user.gender;
+      _selectedCountryCode = user.countryCode ?? "+91";
 
-    // DOB parsing
-    if (user.dob!.isNotEmpty) {
-      final parts = user.dob?.split("-");
-      if (parts?.length == 3) {
-        _selectedYear = parts?[0];
-        final monthIndex = int.tryParse(parts![1]);
-        if (monthIndex != null && monthIndex > 0 && monthIndex <= 12) {
-          _selectedMonth = _months[monthIndex - 1];
+      // ✅ FIX: Safer DOB parsing.
+      if (user.dob != null && user.dob!.isNotEmpty) {
+        final parts = user.dob!.split("-");
+        if (parts.length == 3) {
+          _selectedYear = parts[0];
+          final monthIndex = int.tryParse(parts[1]);
+          if (monthIndex != null && monthIndex >= 1 && monthIndex <= 12) {
+            _selectedMonth = _months[monthIndex - 1];
+          }
+          _selectedDay = parts[2].padLeft(2, '0');
         }
-        _selectedDay = parts[2].padLeft(2, '0');
       }
+
+      // Add listeners only if the form is being populated.
+      _nameController.addListener(_validateForm);
+      _phoneController.addListener(_validateForm);
+      _emailController.addListener(_validateForm);
     }
 
+    // Initialize DOB dropdown lists.
     _days = List.generate(31, (i) => (i + 1).toString().padLeft(2, '0'));
     int currentYear = DateTime.now().year;
     _years = List.generate(100, (i) => (currentYear - i).toString());
 
-    _nameController.addListener(_validateForm);
-    _phoneController.addListener(_validateForm);
-    _emailController.addListener(_validateForm);
-
+    // Run initial validation.
     _validateForm();
   }
 
   void _validateForm() {
-    setState(() {
-      _isFormValid = _nameController.text.isNotEmpty &&
-          _phoneController.text.isNotEmpty &&
-          _emailController.text.isNotEmpty &&
-          _selectedDay != null &&
-          _selectedMonth != null &&
-          _selectedYear != null &&
-          gender.isNotEmpty;
-    });
+    // Also check if the profile exists before trying to validate.
+    if (_currentProfile == null) {
+      if (mounted) setState(() => _isFormValid = false);
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isFormValid = _nameController.text.isNotEmpty &&
+            _phoneController.text.isNotEmpty &&
+            _emailController.text.isNotEmpty &&
+            _selectedDay != null &&
+            _selectedMonth != null &&
+            _selectedYear != null &&
+            gender.isNotEmpty;
+      });
+    }
   }
 
   @override
@@ -108,54 +131,55 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
+      appBar: _appBar("Account Details"),
       body: SafeArea(
-        child: Stack(
+        child: _currentProfile == null
+            ? const Center(
+          child: Text(
+            "User profile not available.",
+            style: TextStyle(fontSize: 16, color: Colors.red),
+          ),
+        )
+            : Stack(
           children: [
-            Column(
-              children: [
-                _appBar("Account Details"),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _profileHeader(),
-                            const SizedBox(height: 16),
-                            Divider(height: 1,color: Colors.grey),
-                            const SizedBox(height: 24),
-                            _buildTextField("Name", _nameController),
-                            const SizedBox(height: 16),
-                            _buildLabel("Gender"),
-                            const SizedBox(height: 8),
-                            _genderSelector(),
-                            const SizedBox(height: 16),
-                            _buildLabel("Date of Birth"),
-                            const SizedBox(height: 8),
-                            _dateOfBirthFields(),
-                            const SizedBox(height: 16),
-                            _phoneField(inputHeight, inputFontSize),
-                            const SizedBox(height: 16),
-                            _buildTextField("Email", _emailController),
-                            const SizedBox(height: 16),
-                            _passwordField(),
-                            const SizedBox(height: 30),
-                            _actionButtons(),
-                          ],
-                        ),
-                      ),
-                    ),
+            SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _profileHeader(),
+                      const SizedBox(height: 16),
+                      const Divider(height: 1, color: Colors.grey),
+                      const SizedBox(height: 24),
+                      _buildTextField("Name", _nameController),
+                      const SizedBox(height: 16),
+                      _buildLabel("Gender"),
+                      const SizedBox(height: 8),
+                      _genderSelector(),
+                      const SizedBox(height: 16),
+                      _buildLabel("Date of Birth"),
+                      const SizedBox(height: 8),
+                      _dateOfBirthFields(),
+                      const SizedBox(height: 16),
+                      _phoneField(inputHeight, inputFontSize),
+                      const SizedBox(height: 16),
+                      _buildTextField("Email", _emailController),
+                      const SizedBox(height: 16),
+                      _passwordField(),
+                      const SizedBox(height: 30),
+                      _actionButtons(),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
             if (_isLoading)
               Container(
@@ -175,8 +199,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     leading: IconButton(
       icon: const Icon(Icons.arrow_back, color: Colors.black),
       onPressed: () {
-        if (widget.onBack != null) widget.onBack!();
-        else if (Navigator.canPop(context)) Navigator.pop(context);
+        if (widget.onBack != null) {
+          widget.onBack!();
+        } else if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
       },
     ),
     centerTitle: true,
@@ -186,17 +213,16 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   );
 
   Widget _profileHeader() {
-    final profilePicUrl = _currentProfile.user.profilePic.url ?? "";
+    // This is now safe because we check for a null profile in the build method.
+    final profilePicUrl = _currentProfile!.user.profilePic.url;
     return Row(
       children: [
         Stack(
           children: [
             CircleAvatar(
               radius: 40,
-              backgroundImage: profilePicUrl.isNotEmpty
-                  ? NetworkImage(profilePicUrl)
-                  : null,
-              child: profilePicUrl.isEmpty ? const Icon(Icons.person) : null,
+              backgroundImage: profilePicUrl.isNotEmpty ? NetworkImage(profilePicUrl) : null,
+              child: profilePicUrl.isEmpty ? const Icon(Icons.person, size: 40) : null,
             ),
             Positioned(
               bottom: 0,
@@ -214,15 +240,19 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
           ],
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_nameController.text,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 4),
-            Text(_emailController.text,
-                style: const TextStyle(color: Colors.grey, fontSize: 14)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_nameController.text,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 4),
+              Text(_emailController.text,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.grey, fontSize: 14)),
+            ],
+          ),
         ),
       ],
     );
@@ -271,7 +301,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => ChangePasswordScreen()),
+                    builder: (_) => const ChangePasswordScreen()),
               );
             },
             child: const Text("Change Password",
@@ -294,7 +324,10 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         final isSelected = gender == entry.key;
         return Expanded(
           child: GestureDetector(
-            onTap: () => setState(() { gender = entry.key; _validateForm(); }),
+            onTap: () => setState(() {
+              gender = entry.key;
+              _validateForm();
+            }),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -323,16 +356,26 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   Widget _dateOfBirthFields() {
     return Row(
       children: [
-        _dobDropdown(_days, _selectedDay, "dd", (v) => setState(() { _selectedDay = v; _validateForm(); })),
+        _dobDropdown(_days, _selectedDay, "DD", (v) => setState(() {
+          _selectedDay = v;
+          _validateForm();
+        })),
         const SizedBox(width: 8),
-        _dobDropdown(_months, _selectedMonth, "mm", (v) => setState(() { _selectedMonth = v; _validateForm(); })),
+        _dobDropdown(_months, _selectedMonth, "MM", (v) => setState(() {
+          _selectedMonth = v;
+          _validateForm();
+        })),
         const SizedBox(width: 8),
-        _dobDropdown(_years, _selectedYear, "yyyy", (v) => setState(() { _selectedYear = v; _validateForm(); })),
+        _dobDropdown(_years, _selectedYear, "YYYY", (v) => setState(() {
+          _selectedYear = v;
+          _validateForm();
+        })),
       ],
     );
   }
 
-  Widget _dobDropdown(List<String> items, String? value, String hint, Function(String?) onChanged) {
+  Widget _dobDropdown(List<String> items, String? value, String hint,
+      void Function(String?) onChanged) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -342,6 +385,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         ),
         child: DropdownButtonFormField<String>(
           value: value,
+          isExpanded: true,
           decoration: const InputDecoration(border: InputBorder.none),
           hint: Text(hint, style: const TextStyle(color: Colors.grey)),
           items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
@@ -368,10 +412,13 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               ),
               child: CountryCodePicker(
                 onChanged: (countryCode) {
-                  setState(() { _selectedCountryCode = countryCode.dialCode ?? "+91"; _validateForm(); });
+                  setState(() {
+                    _selectedCountryCode = countryCode.dialCode ?? "+91";
+                    _validateForm();
+                  });
                 },
                 initialSelection: 'IN',
-                favorite: ['+91', 'IN'],
+                favorite: const ['+91', 'IN'],
                 textStyle: TextStyle(color: Colors.black, fontSize: inputFontSize),
                 showFlag: false,
                 showDropDownButton: true,
@@ -393,6 +440,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
+                    hintText: 'Enter phone number',
                   ),
                   style: TextStyle(fontSize: inputFontSize),
                 ),
@@ -408,30 +456,35 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     return Column(
       children: [
         SizedBox(
-          width: double.infinity,        child: ElevatedButton(
-          onPressed: Navigator.canPop(context) ? () => Navigator.pop(context) : null,
-          style: ElevatedButton.styleFrom(
-            foregroundColor: Colors.black,
-
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30),side: BorderSide(color: Color(0xFFA3DD00))),
-            padding: const EdgeInsets.symmetric(vertical: 16),
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => Navigator.maybePop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  side: const BorderSide(color: Color(0xFFA3DD00))),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text("Cancel", style: TextStyle(fontSize: 16)),
           ),
-          child: const Text("Cancel",style: TextStyle(fontSize: 16),),
-        ),
         ),
         const SizedBox(height: 12),
-
         SizedBox(
-          width: double.infinity,        child: ElevatedButton(
-          onPressed: _isFormValid ? _handleSaveChanges : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFA3DD00),
-            foregroundColor: Colors.black,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-            padding: const EdgeInsets.symmetric(vertical: 16),
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isFormValid ? _handleSaveChanges : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFA3DD00),
+              foregroundColor: Colors.black,
+              disabledBackgroundColor: Colors.grey.shade300,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text("Save Changes", style: TextStyle(fontSize: 16)),
           ),
-          child: const Text("Save Changes",style: TextStyle(fontSize: 16)),
-        ),
         ),
       ],
     );
@@ -439,9 +492,10 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
   // -------------------- Save Logic --------------------
   void _handleSaveChanges() async {
-    final oldPhone = _currentProfile.user.phone;
-    final oldEmail = _currentProfile.user.email;
-    final oldDob = _currentProfile.user.dob;
+    // This logic is now safe because we've confirmed _currentProfile is not null.
+    final oldPhone = _currentProfile!.user.phone;
+    final oldEmail = _currentProfile!.user.email;
+    final oldDob = _currentProfile!.user.dob;
 
     final newPhone = _phoneController.text.trim();
     final newEmail = _emailController.text.trim();
@@ -453,52 +507,17 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     final dobChanged = newDob != oldDob;
 
     final otherChanges =
-        _nameController.text.trim() != _currentProfile.user.username ||
-            gender != _currentProfile.user.gender ||
+        _nameController.text.trim() != _currentProfile!.user.username ||
+            gender != _currentProfile!.user.gender ||
             dobChanged;
-    if (emailChanged && phoneChanged) {
-      setState(() => _isLoading = true);
-      try {
-        await _apiService.sendEmailOtp(newEmail);
-        if (!mounted) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChangeInfoScreen(
-              title: "OTP Verification",
-              subtitle: "Enter the OTP received on your email",
-              showEmail: true,
-              showPhone: false,
-              onVerified: ({emailOtp, phoneOtp}) {
-                _updateProfileLoader(
-                  otp: emailOtp,
-                  otpType: "email",
-                  dob: newDob,
-                );
-              },
-            ),
-          ),
-        );
-      } on DioException catch (e) {
-        if (e.type == DioExceptionType.receiveTimeout) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("OTP may take a few seconds — please check your inbox."),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Error sending Email OTP: ${e.message}")),
-          );
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Unexpected error: $e")),
-        );
-      }
 
+    if (!phoneChanged && !emailChanged && !otherChanges) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No changes were made.")),
+      );
       return;
     }
+
     if (emailChanged) {
       setState(() => _isLoading = true);
       try {
@@ -527,7 +546,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
           SnackBar(content: Text("Error sending Email OTP: $e")),
         );
       } finally {
-        setState(() => _isLoading = false);
+        if(mounted) setState(() => _isLoading = false);
       }
       return;
     }
@@ -559,10 +578,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
           SnackBar(content: Text("Error sending Phone OTP: $e")),
         );
       } finally {
-        setState(() => _isLoading = false);
+        if(mounted) setState(() => _isLoading = false);
       }
       return;
     }
+
     if (otherChanges) {
       _updateProfileLoader(dob: newDob);
     }
@@ -591,19 +611,27 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       print("Update Profile Request Sent.");
       print("Update Profile Response: $response");
 
+      if (!mounted) return;
+
       setState(() {
-        _currentProfile = response as UserProfileResponse;
+        // Here you would ideally update _currentProfile with the response data
+        // For now, we just stop loading.
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile updated successfully!")),
       );
+
+      // Optionally pop the screen or refresh previous screen state
+      Navigator.pop(context, true); // Pop back and indicate success
+
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error updating profile: $e")),
       );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }

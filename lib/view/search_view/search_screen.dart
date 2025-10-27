@@ -599,99 +599,234 @@ class _SearchScreenState extends State<SearchScreen>
   }
 }
 
-// --- New and Updated "See All" Screens ---
-
-// FIX 2: Implement Grid View for Products
-class ProductListScreen extends StatelessWidget {
+class ProductListScreen extends StatefulWidget {
   final List<Product> products;
   const ProductListScreen({super.key, required this.products});
 
   @override
+  State<ProductListScreen> createState() => _ProductListScreenState();
+}
+
+class _ProductListScreenState extends State<ProductListScreen> {
+  // Controller to manage the search text field
+  late final TextEditingController _searchController;
+  // List to hold the products that match the search query
+  late List<Product> _filteredProducts;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    // Initially, the filtered list is the complete list of products
+    _filteredProducts = widget.products;
+
+    // Add a listener to the controller to filter the list whenever the text changes
+    _searchController.addListener(_filterProducts);
+  }
+
+  @override
+  void dispose() {
+    // Clean up the controller when the widget is removed from the widget tree
+    _searchController.removeListener(_filterProducts);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // --- START: Filtering Logic ---
+  void _filterProducts() {
+    final query = _searchController.text;
+    if (query.isEmpty) {
+      // If the search query is empty, show all products
+      setState(() {
+        _filteredProducts = widget.products;
+      });
+    } else {
+      // Otherwise, filter the products based on the name
+      setState(() {
+        _filteredProducts = widget.products.where((product) {
+          // Case-insensitive search
+          return product.name.toLowerCase().contains(query.toLowerCase());
+        }).toList();
+      });
+    }
+  }
+  // --- END: Filtering Logic ---
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFCFCFF),
       appBar: AppBar(
-        title: const Text("All Products"),
-        backgroundColor: const Color(0xffd5ff4d),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         foregroundColor: Colors.black,
+        centerTitle: true,
+        title: const Text(
+          'All Products',
+          style: TextStyle(
+            color: Color(0xFF121111),
+            fontSize: 16,
+            fontFamily: 'Encode Sans',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
-      body:
-          products.isEmpty
-              ? const Center(child: Text("No products to display."))
-              : GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.75, // Adjust this ratio for your design
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 27, vertical: 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // Reduced vertical padding
+              decoration: ShapeDecoration(
+                color: const Color(0xFFEFF3EE),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
-                  final product = products[index];
-                  return GestureDetector(
-                    onTap:
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (_) =>
-                                    ProductDetailScreen(productId: product.id),
+              ),
+              // --- START: Updated TextField ---
+              child: TextField(
+                controller: _searchController, // Use the controller
+                decoration: const InputDecoration(
+                  icon: Icon(Icons.search, color: Color(0xFF626262), size: 20),
+                  hintText: 'Search...',
+                  hintStyle: TextStyle(
+                    color: Color(0xFF626262),
+                    fontSize: 14,
+                    fontFamily: 'Encode Sans',
+                    fontWeight: FontWeight.w300,
+                  ),
+                  border: InputBorder.none, // Hide the default underline
+                ),
+                style: const TextStyle( // Style for the user's input text
+                  color: Color(0xFF272727),
+                  fontSize: 14,
+                  fontFamily: 'Encode Sans',
+                ),
+              ),
+              // --- END: Updated TextField ---
+            ),
+          ),
+          Expanded(
+            // --- Use the _filteredProducts list for the GridView ---
+            child: _filteredProducts.isEmpty
+                ? const Center(child: Text("No products found."))
+                : LayoutBuilder(
+              builder: (context, constraints) {
+                const double childAspectRatio = 0.7;
+                // --- The GridView now uses _filteredProducts ---
+                return GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(35, 10, 35, 20),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 20,
+                    mainAxisSpacing: 20,
+                    childAspectRatio: childAspectRatio,
+                  ),
+                  itemCount: _filteredProducts.length, // Use the length of the filtered list
+                  itemBuilder: (context, index) {
+                    final product = _filteredProducts[index]; // Get product from the filtered list
+                    return GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProductDetailScreen(productId: product.id),
+                        ),
+                      ),
+                      child: Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: ShapeDecoration(
+                          color: const Color(0xFFF4F4F4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                    child: Card(
-                      clipBehavior: Clip.antiAlias,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Image.network(
-                              product.images.isNotEmpty
-                                  ? product.images.first.url
-                                  : "https://placehold.co/300",
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder:
-                                  (_, __, ___) => const Center(
-                                    child: Icon(Icons.broken_image),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Stack(
+                                children: [
+                                  Positioned.fill(
+                                    child: ClipRRect(
+                                      borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                                      child: Image.network(
+                                        product.images.isNotEmpty
+                                            ? product.images.first.url
+                                            : "https://placehold.co/168x139",
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const Center(
+                                          child: Icon(Icons.broken_image),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              product.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                                  Positioned(
+                                    top: 5,
+                                    right: 5,
+                                    child: Container(
+                                      width: 24,
+                                      height: 24,
+                                      child: IconButton(
+                                        padding: EdgeInsets.zero,
+                                        icon: const Icon(
+                                          Icons.favorite_border,
+                                          color: Colors.black,
+                                          size: 16,
+                                        ),
+                                        onPressed: () {
+                                          // TODO: Implement favorite functionality
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8.0,
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    product.name,
+                                    style: const TextStyle(
+                                      color: Color(0xFF272727),
+                                      fontSize: 12,
+                                      fontFamily: 'Encode Sans',
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '₹ ${product.price.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF272727),
+                                      fontSize: 12,
+                                      fontFamily: 'Encode Sans',
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: Text(
-                              "${product.price.toStringAsFixed(2)} ₹",
-                              style: const TextStyle(color: Colors.black87),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
+                            const SizedBox(height: 16),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// FIX 2: Implement Grid View for People
 class PeopleListScreen extends StatelessWidget {
   final List<UserModel> people;
   const PeopleListScreen({super.key, required this.people});
@@ -757,7 +892,6 @@ class PeopleListScreen extends StatelessWidget {
   }
 }
 
-// FIX 3: New Screen to Play Videos
 class VideoPlayerScreen extends StatefulWidget {
   final String videoUrl;
   const VideoPlayerScreen({super.key, required this.videoUrl});

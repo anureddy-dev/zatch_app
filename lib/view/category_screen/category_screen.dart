@@ -40,8 +40,12 @@ class _CategoryScreenState extends State<CategoryScreen> {
         errorMessage = null;
       });
       final fetchedCategories = await _apiService.getCategories();
+      final displayCategories = fetchedCategories
+          .where((cat) => cat.name.toLowerCase() != 'explore all')
+          .toList();
+
       setState(() {
-        categories = fetchedCategories;
+        categories = displayCategories;
       });
     } catch (e) {
       setState(() {

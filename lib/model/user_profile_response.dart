@@ -4,8 +4,7 @@ class UserProfileResponse {
   final User user;
 
   UserProfileResponse({
-    required this.success,
-    required this.message,
+    required this.success,    required this.message,
     required this.user,
   });
 
@@ -47,8 +46,8 @@ class User {
   final int reviewsCount;
   final int productsSoldCount;
   final int customerRating;
-  final List<dynamic> savedBits;
-  final List<dynamic> savedProducts;
+  final List<SavedBit> savedBits;
+  final List<SavedProduct> savedProducts;
   final bool isAdmin;
   final DateTime createdAt;
   final String sellerStatus;
@@ -65,7 +64,7 @@ class User {
     required this.gender,
     required this.categoryType,
     required this.profilePic,
-   // required this.sellerProfile,
+    // required this.sellerProfile,
     //required this.globalBargainSettings,
     required this.followers,
     required this.following,
@@ -93,7 +92,7 @@ class User {
       gender: json['gender'] ?? '',
       categoryType: json['categoryType'] ?? '',
       profilePic: ProfilePic.fromJson(json['profilePic'] ?? {}),
-    /*  sellerProfile: json['sellerProfile'] != null
+      /*  sellerProfile: json['sellerProfile'] != null
           ? SellerProfile.fromJson(json['sellerProfile'])
           : null,
       globalBargainSettings: json['globalBargainSettings'] != null
@@ -105,8 +104,10 @@ class User {
       reviewsCount: json['reviewsCount'] ?? 0,
       productsSoldCount: json['productsSoldCount'] ?? 0,
       customerRating: json['customerRating'] ?? 0,
-      savedBits: List<dynamic>.from(json['savedBits'] ?? []),
-      savedProducts: List<dynamic>.from(json['savedProducts'] ?? []),
+      // ⭐️ FIXED: Correctly parse the list of maps into a list of SavedBit objects
+      savedBits: List<SavedBit>.from((json["savedBits"] ?? []).map((x) => SavedBit.fromJson(x))),
+      // ⭐️ FIXED: Correctly parse the list of maps into a list of SavedProduct objects
+      savedProducts: List<SavedProduct>.from((json["savedProducts"] ?? []).map((x) => SavedProduct.fromJson(x))),
       isAdmin: json['isAdmin'] ?? false,
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       sellerStatus: json['sellerStatus'] ?? '',
@@ -134,8 +135,9 @@ class User {
       'reviewsCount': reviewsCount,
       'productsSoldCount': productsSoldCount,
       'customerRating': customerRating,
-      'savedBits': savedBits,
-      'savedProducts': savedProducts,
+      // ⭐️ FIXED: Convert list of objects back to list of maps
+      'savedBits': List<dynamic>.from(savedBits.map((x) => x.toJson())),
+      'savedProducts': List<dynamic>.from(savedProducts.map((x) => x.toJson())),
       'isAdmin': isAdmin,
       'createdAt': createdAt.toIso8601String(),
       'sellerStatus': sellerStatus,
@@ -170,6 +172,7 @@ class ProfilePic {
     'url': url,
   };
 }
+
 /*
 class SellerProfile {
   final Address? address;
@@ -311,3 +314,77 @@ class GlobalBargainSettings {
     'maximumDiscount': maximumDiscount,
   };
 }*/
+
+// ⭐️ ADDED: The required classes are now included in this file. ⭐️
+class SavedBit {
+  final BitVideo video;
+  final String id;
+
+  SavedBit({required this.video, required this.id});
+
+  factory SavedBit.fromJson(Map<String, dynamic> json) => SavedBit(
+    video: BitVideo.fromJson(json["video"] ?? {}),
+    id: json["_id"] ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {
+    "video": video.toJson(),
+    "_id": id,
+  };
+}
+
+class BitVideo {
+  final String url;
+
+  BitVideo({required this.url});
+
+  factory BitVideo.fromJson(Map<String, dynamic> json) => BitVideo(
+    url: json["url"] ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {
+    "url": url,
+  };
+}
+
+class SavedProduct {
+  final String id;
+  final String name;
+  final double price;
+  final List<ProductImage> images;
+
+  SavedProduct({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.images,
+  });
+
+  factory SavedProduct.fromJson(Map<String, dynamic> json) => SavedProduct(
+    id: json["_id"] ?? '',
+    name: json["name"] ?? 'Unnamed Product',
+    price: (json["price"] as num?)?.toDouble() ?? 0.0,
+    images: List<ProductImage>.from((json["images"] ?? []).map((x) => ProductImage.fromJson(x))),
+  );
+
+  Map<String, dynamic> toJson() => {
+    "_id": id,
+    "name": name,
+    "price": price,
+    "images": List<dynamic>.from(images.map((x) => x.toJson())),
+  };
+}
+
+class ProductImage {
+  final String url;
+
+  ProductImage({required this.url});
+
+  factory ProductImage.fromJson(Map<String, dynamic> json) => ProductImage(
+    url: json["url"] ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {
+    "url": url,
+  };
+}

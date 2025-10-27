@@ -33,9 +33,41 @@ class LiveStreamController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleSave(BuildContext context) {
+  Future<void> toggleSave(BuildContext context) async {
+    final bitId = session?.id;
+    if (bitId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error: Could not find item to save.")),
+      );
+      return;
+    }
+
+    final previousState = isSaved;
     isSaved = !isSaved;
     notifyListeners();
+
+    try {
+      final response = await _api.toggleBitSavedStatus(bitId);
+      isSaved = response.savedBitsCount > 0;
+      if (isSaved != previousState) {
+        notifyListeners();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isSaved ? "Saved to collection" : "Removed from saves",
+          ),
+        ),
+      );
+    } catch (e) {
+      isSaved = previousState;
+      notifyListeners();
+
+      debugPrint("Failed to update save status: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't save item. Please try again.")),
+      );
+    }
   }
 
   void share(BuildContext context) {

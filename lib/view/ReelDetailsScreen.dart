@@ -7,6 +7,7 @@ import 'package:zatch_app/model/product_response.dart';
 import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/cart_screen.dart';
 import 'package:zatch_app/view/product_view/product_detail_screen.dart';
+import 'package:zatch_app/view/profile/profile_screen.dart';
 import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
 import 'package:zatch_app/view/zatching_details_screen.dart'; // Import the service
 
@@ -86,6 +87,12 @@ class _ReelDetailsScreenState extends State<ReelDetailsScreen>
       await widget.controller?.fetchProducts();
       final bitDetails = await ApiService().fetchBitDetails(widget.bitId);
       _bitDetails = bitDetails;
+      if (mounted) {
+        setState(() {
+        //  isSaved = bitDetails.isSaved;
+          likeCount = bitDetails.likeCount;
+        });
+      }
       if (bitDetails.video.url.isNotEmpty) {
         final videoUrl = bitDetails.video.url.replaceFirst(
           '/upload/',
@@ -113,6 +120,47 @@ class _ReelDetailsScreenState extends State<ReelDetailsScreen>
     }
   }
 
+  Future<void> _toggleSave() async {
+    // 1. Store the previous state and optimistically update the UI.
+    final previousState = isSaved;    setState(() {
+      isSaved = !isSaved;
+    });
+
+    try {
+      // 2. Call the API and get the structured response.
+      final response = await ApiService().toggleBitSavedStatus(widget.bitId);
+
+      // 3. Use `savedBitsCount` from the server's response to set the definitive state.
+      // If count > 0, the item is saved. Otherwise, it is not.
+      final serverState = response.savedBitsCount > 0;
+
+      // 4. Update the UI only if it's out of sync with the server's definitive state.
+      if (mounted && isSaved != serverState) {
+        setState(() {
+          isSaved = serverState;
+        });
+      }
+
+      // Show a confirmation message based on the final state.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isSaved ? "Saved to collection" : "Removed from collection"),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      // 5. If the API call fails, revert to the previous state and show an error.
+      if (mounted) {
+        setState(() {
+          isSaved = previousState; // Revert the change
+        });
+      }
+      debugPrint("Failed to update save status: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't update save status. Please try again.")),
+      );
+    }
+  }
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -183,32 +231,42 @@ class _ReelDetailsScreenState extends State<ReelDetailsScreen>
             top: 45,
             left: 20,
             right: 20,
-            child: Row(
-              children: [
-                const CircleAvatar(
-                    radius: 24,
-                    backgroundImage:
-                    NetworkImage("https://picsum.photos/id/237/200/200")),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _bitDetails!.title, // Using title from API
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+            child: GestureDetector(
+              onTap: (){
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfileScreen(userId: _bitDetails?.id ?? ""),
+                  ),
+                );
+              },
+              child: Row(
+                children: [
+                   CircleAvatar(
+                      radius: 24,
+                      backgroundImage:
+                      NetworkImage(_bitDetails?.video.url ?? "https://picsum.photos/id/237/200/200")),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _bitDetails?.title ?? "", // Using title from API
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    Text(
-                      _bitDetails!.description, // Using description from API
-                      style:
-                      const TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ],
+                      Text(
+                        _bitDetails?.description ??"", // Using description from API
+                        style:
+                        const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -237,7 +295,7 @@ class _ReelDetailsScreenState extends State<ReelDetailsScreen>
                 const SizedBox(height: 20),
                 _SidebarItem(
                   icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
-                  onTap: () => setState(() => isSaved = !isSaved),
+                  onTap: _toggleSave,
                 ),
                 const SizedBox(height: 20),
                 _SidebarItem(
@@ -260,8 +318,7 @@ class _ReelDetailsScreenState extends State<ReelDetailsScreen>
                       style: TextStyle(color: Colors.white, fontSize: 13)),
                   GestureDetector(
                     onTap: () {
-                      _videoController.pause();
-                      _showCatalogueBottomSheet(context).then((_) {
+                      if (_isVideoInitialized) _videoController.pause();                      _showCatalogueBottomSheet(context).then((_) {
                         if (mounted) {
                           _videoController.play();
                         }
@@ -287,8 +344,8 @@ class _ReelDetailsScreenState extends State<ReelDetailsScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemBuilder: (context, index) {
                   final product = widget.controller?.products[index];
-                  final productImage = product?.images != null
-                      ? product?.images.first.url
+                  final productImage = product?.images?.isNotEmpty == true
+                      ? product!.images.first.url
                       : "https://placehold.co/100x100/222/FFF?text=P";
                   return Padding(
                     padding: const EdgeInsets.only(right: 12.0),
@@ -701,7 +758,7 @@ class _ReelDetailsScreenState extends State<ReelDetailsScreen>
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(10),
                                         child: Image.network(
-                                          product?.images != null
+                                          product?.images .isNotEmpty == true
                                               ? "${product?.images.first.url}"
                                               : "https://placehold.co/95x118",
                                           width: 56,
@@ -1126,7 +1183,9 @@ class _ReelDetailsScreenState extends State<ReelDetailsScreen>
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.network(product?.images.first.url ?? "",
+                          child: Image.network(product?.images?.isNotEmpty == true
+                              ? product!.images.first.url
+                              : "https://placehold.co/100x100?text=P",
                               width: 60, height: 60, fit: BoxFit.cover),
                         ),
                         const SizedBox(width: 12),

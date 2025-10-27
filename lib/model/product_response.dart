@@ -29,7 +29,7 @@ class Product {
   final double price;
   final List<ProductImage> images;
   final Category? category;
-  final int? stock;
+   int? stock;
   final String? condition;
   final String? color;
   final String? size;

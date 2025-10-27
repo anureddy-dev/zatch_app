@@ -46,7 +46,7 @@ class _FollowersWidgetState extends State<FollowersWidget> {
       await _controller.toggleFollow(userId);
       final user = _controller.followers.firstWhere((u) => u.id == userId);
       if (mounted) {
-        Flushbar(
+       /* Flushbar(
           title: user.isFollowing ? "Followed" : "Unfollowed",
           message:
           "${user.isFollowing ? "You are now following" : "You have unfollowed"} $username",
@@ -56,7 +56,7 @@ class _FollowersWidgetState extends State<FollowersWidget> {
           borderRadius: BorderRadius.circular(8),
           icon: const Icon(Icons.check_circle_outline, size: 28.0, color: Colors.white),
           flushbarPosition: FlushbarPosition.TOP,
-        ).show(context);
+        ).show(context);*/
       }
     } catch (e) {
       if (mounted) {

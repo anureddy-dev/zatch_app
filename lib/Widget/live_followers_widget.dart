@@ -74,9 +74,7 @@ class _LiveFollowersWidgetState extends State<LiveFollowersWidget> {
       );
     }
 
-    // Don't show the widget if there are no sessions or an error
     if (_liveSessions.isEmpty) {
-      // You can return an empty container or a message
       return const SizedBox.shrink();
     }
 
