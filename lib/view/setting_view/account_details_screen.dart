@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart'; // Import image_picker
 import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/services/api_service.dart';
 import 'change_info_screen.dart';
@@ -20,7 +23,6 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   final ApiService _apiService = ApiService();
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers are late-initialized but safely within initState.
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
@@ -41,23 +43,22 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   bool _isLoading = false;
   bool _isFormValid = false;
 
-  // ✅ FIX: The profile state can be nullable.
   UserProfileResponse? _currentProfile;
+
+  // --- NEW: Image handling state variables ---
+  File? _profileImageFile;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
 
-    // ✅ FIX: Safely check for null before using the profile.
     if (widget.userProfile == null) {
-      // If no profile is passed, we can't initialize the form.
-      // The build method will handle showing an error message.
       _currentProfile = null;
       _nameController = TextEditingController();
       _phoneController = TextEditingController();
       _emailController = TextEditingController();
     } else {
-      // If the profile exists, proceed with initialization.
       _currentProfile = widget.userProfile!;
       final user = _currentProfile!.user;
 
@@ -67,7 +68,6 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       gender = user.gender;
       _selectedCountryCode = user.countryCode ?? "+91";
 
-      // ✅ FIX: Safer DOB parsing.
       if (user.dob != null && user.dob!.isNotEmpty) {
         final parts = user.dob!.split("-");
         if (parts.length == 3) {
@@ -80,23 +80,165 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         }
       }
 
-      // Add listeners only if the form is being populated.
       _nameController.addListener(_validateForm);
       _phoneController.addListener(_validateForm);
       _emailController.addListener(_validateForm);
     }
 
-    // Initialize DOB dropdown lists.
     _days = List.generate(31, (i) => (i + 1).toString().padLeft(2, '0'));
     int currentYear = DateTime.now().year;
     _years = List.generate(100, (i) => (currentYear - i).toString());
 
-    // Run initial validation.
     _validateForm();
   }
 
+  // --- NEW: Method to get the current image provider ---
+  ImageProvider? get _currentImageProvider {
+    if (_profileImageFile != null) {
+      return FileImage(_profileImageFile!);
+    }
+    if (_currentProfile?.user.profilePic.url.isNotEmpty ?? false) {
+      return NetworkImage(_currentProfile!.user.profilePic.url);
+    }
+    return null;
+  }
+
+  // --- NEW: Logic for picking an image ---
+  Future<void> _pickImage(ImageSource source) async {
+    Navigator.of(context).pop(); // Close the actions dialog first
+
+    try {
+      final pickedFile = await _picker.pickImage(source: source, imageQuality: 80);
+
+      if (pickedFile != null) {
+        setState(() {
+          _profileImageFile = File(pickedFile.path);
+        });
+        // Now close the preview dialog underneath
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      print("Image picker error: $e");
+      if(Navigator.of(context).canPop()){
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  // --- NEW: Logic for deleting the image ---
+  void _deleteImage() {
+    setState(() {
+      _profileImageFile = null;
+    });
+    Navigator.of(context).pop(); // Close actions dialog
+    Navigator.of(context).pop(); // Close preview dialog
+  }
+
+  // --- NEW: Shows the dialog with "Take Photo", "Upload", "Delete" ---
+  void _showImageActionsDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: Colors.white,
+          contentPadding: EdgeInsets.zero,
+          content: Container(
+            width: 165,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDialogActionItem('Take Photo', () => _pickImage(ImageSource.camera)),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                _buildDialogActionItem('Upload', () => _pickImage(ImageSource.gallery)),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                _buildDialogActionItem('Delete', _deleteImage, color: Colors.red.shade700),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- NEW: Helper for building dialog action items ---
+  Widget _buildDialogActionItem(String title, VoidCallback onTap, {Color color = const Color(0xFF6A7282)}) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: color,
+            fontSize: 16,
+            fontFamily: 'Source Sans Pro',
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- NEW: Shows the full-screen circular image preview ---
+  void _showImagePreviewDialog() {
+    final imageProvider = _currentImageProvider;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(
+            alignment: Alignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(), // Tap background to dismiss
+                child: Container(color: Colors.transparent),
+              ),
+              Container(
+                width: 323,
+                height: 323,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey[200],
+                  boxShadow: const [BoxShadow(color: Color(0x3F000000), blurRadius: 4, offset: Offset(0, 4))],
+                  image: imageProvider != null
+                      ? DecorationImage(image: imageProvider, fit: BoxFit.cover)
+                      : null,
+                ),
+                child: imageProvider == null
+                    ? const Icon(Icons.person, size: 160, color: Colors.grey)
+                    : null,
+              ),
+              Positioned(
+                top: (MediaQuery.of(context).size.height / 2) + 110,
+                left: (MediaQuery.of(context).size.width / 2) + 75,
+                child: GestureDetector(
+                  onTap: _showImageActionsDialog,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: Color(0x1E1A0F01), blurRadius: 4, offset: Offset(0, 1))],
+                    ),
+                    child: const Icon(Icons.edit, color: Colors.black, size: 24),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _validateForm() {
-    // Also check if the profile exists before trying to validate.
     if (_currentProfile == null) {
       if (mounted) setState(() => _isFormValid = false);
       return;
@@ -173,7 +315,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                       const SizedBox(height: 16),
                       _buildTextField("Email", _emailController),
                       const SizedBox(height: 16),
-                      _passwordField(),
+                      _passwordField(userProfile: widget.userProfile!),
                       const SizedBox(height: 30),
                       _actionButtons(),
                     ],
@@ -213,28 +355,33 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   );
 
   Widget _profileHeader() {
-    // This is now safe because we check for a null profile in the build method.
-    final profilePicUrl = _currentProfile!.user.profilePic.url;
     return Row(
       children: [
         Stack(
           children: [
+            // Use the _currentImageProvider which reflects local changes
             CircleAvatar(
               radius: 40,
-              backgroundImage: profilePicUrl.isNotEmpty ? NetworkImage(profilePicUrl) : null,
-              child: profilePicUrl.isEmpty ? const Icon(Icons.person, size: 40) : null,
+              backgroundImage: _currentImageProvider,
+              child: _currentImageProvider == null
+                  ? const Icon(Icons.person, size: 40, color: Colors.grey)
+                  : null,
             ),
             Positioned(
               bottom: 0,
               right: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFA3DD00),
-                  border: Border.all(color: Colors.white, width: 2),
+              child: GestureDetector(
+                // --- MODIFIED: This now triggers the preview dialog ---
+                onTap: _showImagePreviewDialog,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFA3DD00),
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: const Icon(Icons.edit, color: Colors.black, size: 16),
                 ),
-                padding: const EdgeInsets.all(4),
-                child: const Icon(Icons.edit, color: Colors.black, size: 16),
               ),
             ),
           ],
@@ -283,7 +430,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         ],
       );
 
-  Widget _passwordField() => Column(
+  Widget _passwordField({UserProfileResponse? userProfile}) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _buildLabel("Password"),
@@ -301,7 +448,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => const ChangePasswordScreen()),
+                    builder: (_) =>  ChangePasswordScreen( userProfile: userProfile,)),
               );
             },
             child: const Text("Change Password",
@@ -492,7 +639,6 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
   // -------------------- Save Logic --------------------
   void _handleSaveChanges() async {
-    // This logic is now safe because we've confirmed _currentProfile is not null.
     final oldPhone = _currentProfile!.user.phone;
     final oldEmail = _currentProfile!.user.email;
     final oldDob = _currentProfile!.user.dob;
@@ -506,12 +652,15 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     final emailChanged = newEmail != oldEmail;
     final dobChanged = newDob != oldDob;
 
+    // --- MODIFIED: Also check if a new profile image has been picked ---
+    final imageChanged = _profileImageFile != null;
+
     final otherChanges =
         _nameController.text.trim() != _currentProfile!.user.username ||
             gender != _currentProfile!.user.gender ||
             dobChanged;
 
-    if (!phoneChanged && !emailChanged && !otherChanges) {
+    if (!phoneChanged && !emailChanged && !otherChanges && !imageChanged) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("No changes were made.")),
       );
@@ -583,7 +732,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       return;
     }
 
-    if (otherChanges) {
+    if (otherChanges || imageChanged) {
       _updateProfileLoader(dob: newDob);
     }
   }
@@ -597,6 +746,13 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // --- MODIFIED: The 'profileImage' parameter is removed as requested ---
+      // We still check for other changes and show a success message.
+      // In a real app, you would pass the _profileImageFile here.
+      if(_profileImageFile != null) {
+        print("An image was selected, but we are not uploading it as per the request.");
+      }
+
       final response = await _apiService.updateUserProfile(
         name: _nameController.text.trim(),
         gender: gender,
@@ -613,17 +769,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
       if (!mounted) return;
 
-      setState(() {
-        // Here you would ideally update _currentProfile with the response data
-        // For now, we just stop loading.
-      });
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile updated successfully!")),
       );
 
-      // Optionally pop the screen or refresh previous screen state
-      Navigator.pop(context, true); // Pop back and indicate success
+      Navigator.pop(context, true);
 
     } catch (e) {
       if (!mounted) return;

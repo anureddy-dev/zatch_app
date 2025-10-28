@@ -11,6 +11,7 @@ import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/LiveDetailsScreen.dart';
 import 'package:zatch_app/view/ReelDetailsScreen.dart';
 import 'package:zatch_app/view/product_view/product_detail_screen.dart';
+import 'package:zatch_app/view/profile_image_viewer.dart';
 import 'package:zatch_app/view/zatching_details_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -185,25 +186,58 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildProfileHeader(UserProfile user) {
+    const heroTag = "profile-picture-hero";
+    // Determine if the URL is valid. Use a placeholder if not.
+    final hasImage = user.profilePicUrl != null && user.profilePicUrl!.isNotEmpty;
+    final imageUrl = hasImage
+        ? user.profilePicUrl!
+        : "https://via.placeholder.com/150/FFFFFF/000000?Text=No+Image"; // A default placeholder
+
     return Positioned(
       top: 8,
       left: 0,
       right: 0,
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: CircleAvatar(
-              radius: 50,
-              backgroundImage: user.profilePicUrl != null && user.profilePicUrl!.isNotEmpty
-                  ? NetworkImage(user.profilePicUrl!)
-                  : const NetworkImage("https://via.placeholder.com/150"),
-              // Handles cases where the image URL is invalid
-              onBackgroundImageError: (_, __) {},
+          GestureDetector(
+            // MODIFIED: This onTap will now always trigger
+            onTap: () {
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  opaque: false,
+                  barrierDismissible: true,
+                  pageBuilder: (BuildContext context, _, __) {
+                    return ProfileImageViewer(
+                      // Pass the determined imageUrl (real or placeholder)
+                      imageUrl: imageUrl,
+                      heroTag: heroTag,
+                    );
+                  },
+                ),
+              );
+            },
+            child: Hero(
+              tag: heroTag,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 50,
+                  // MODIFIED: Use the determined 'hasImage' boolean
+                  backgroundImage: hasImage ? NetworkImage(user.profilePicUrl!) : null,
+                  // REMOVED: onBackgroundImageError to prevent the crash
+                  // Show a placeholder icon only if there's no image
+                  child: !hasImage
+                      ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                      : null,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -211,15 +245,17 @@ class _ProfileScreenState extends State<ProfileScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                user.username ?? "Unnamed User",
+               "${ user.username}", // Using user.username directly as it's non-nullable in the model
                 style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87),
               ),
-              const SizedBox(width: 6),
-              const Icon(Icons.verified,
-                  size: 18, color: Colors.lightBlueAccent),
+              const SizedBox(width: 6),/*
+              // Conditionally show verified icon based on user data
+              if (user.isVerified)*/
+                const Icon(Icons.verified,
+                    size: 18, color: Color(0xFFCCF656)),
             ],
           ),
           Text(

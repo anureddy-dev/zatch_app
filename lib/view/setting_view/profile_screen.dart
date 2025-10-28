@@ -5,6 +5,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/profile/following_list_screen.dart';
+import 'package:zatch_app/view/profile_image_viewer.dart';
 
 import '../../controller/live_stream_controller.dart';
 import '../ReelDetailsScreen.dart';
@@ -64,9 +65,11 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     final name = user?.username ?? "Unknown User";
     final followers = user?.followerCount ?? 0;
-    final profilePicUrl = user?.profilePic?.url?.isNotEmpty ?? false
+    final bool hasImage = user?.profilePic?.url != null && user?.profilePic?.url.isNotEmpty == true;
+    final String profilePicUrl = hasImage
         ? user!.profilePic!.url
-        : "https://via.placeholder.com/150"; // fallback avatar
+        : "https://via.placeholder.com/150/FFFFFF/000000?Text=No+Image"; // A default placeholder
+
 
     return Scaffold(
       appBar: AppBar(
@@ -176,9 +179,18 @@ class _ProfileScreenState extends State<ProfileScreen>
             left: MediaQuery.of(context).size.width / 2 - 50,
             child: GestureDetector(
               onTap: (){
-                if (profilePicUrl.isNotEmpty && !profilePicUrl.contains('placeholder')) {
-                  _showFullScreenImage(context, profilePicUrl);
-                }
+                Navigator.of(context).push(
+                  PageRouteBuilder(
+                    opaque: false, // Makes the new page background transparent
+                    barrierDismissible: true,
+                    pageBuilder: (BuildContext context, _, __) {
+                      return ProfileImageViewer(
+                        imageUrl: profilePicUrl, // Pass the determined URL
+                        heroTag: profilePicUrl,   // Use the URL as the unique Hero tag
+                      );
+                    },
+                  ),
+                );
               },
               child: Hero(
                 tag: profilePicUrl, // Use a unique tag for the animation

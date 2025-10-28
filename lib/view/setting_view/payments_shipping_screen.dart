@@ -64,6 +64,7 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
   Coupon? appliedCoupon;
   double discountAmount = 0.0;
   late double finalSubTotal;
+  Object? _selectedPaymentMethod;
 
   @override
   void initState() {
@@ -75,6 +76,23 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
       selectedAddressIndex = officeIndex;
     }
   }
+
+  void _selectPaymentMethod() async {
+
+    final result = await Navigator.push<Object>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const PaymentMethodScreen(),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _selectedPaymentMethod = result;
+      });
+    }
+  }
+
 
   /// Applies the selected coupon and updates the totals.
   void _applyCoupon(Coupon coupon) {
@@ -299,17 +317,7 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
                   const SizedBox(height: 16),
                   _paymentTile(0, "VISA", "2143"),
                   const SizedBox(height: 16),
-                  _addNewButton("Add New Payment", () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (_) => PaymentMethodScreen(
-                              data: PaymentData.getDummy(),
-                            ),
-                      ),
-                    );
-                  }),
+                  _buildPaymentSection(),
                   if (widget.isCheckout) ...[
                     const SizedBox(height: 36),
                     const Text(
@@ -929,4 +937,51 @@ class _CheckoutOrPaymentsScreenState extends State<CheckoutOrPaymentsScreen> {
       ),
     );
   }
+
+  Widget _buildPaymentSection() {
+    // Case 1: A payment method has been selected.
+    if (_selectedPaymentMethod != null) {
+      String title = 'Unknown Payment Method';
+      IconData icon = Icons.credit_card;
+      Color iconColor = Colors.grey;
+
+      // Determine the type of the selected method and set the details.
+      if (_selectedPaymentMethod is CardModel) {
+        final card = _selectedPaymentMethod as CardModel;
+        title = '${card.brand} **** ${card.last4}';
+        icon = Icons.credit_card;
+        iconColor = Colors.blue;
+      } else if (_selectedPaymentMethod is UpiModel) {
+        final upi = _selectedPaymentMethod as UpiModel;
+        title = upi.upiId;
+        icon = Icons.account_balance_wallet;
+        iconColor = Colors.green;
+      } else if (_selectedPaymentMethod is WalletModel) {
+        final wallet = _selectedPaymentMethod as WalletModel;
+        title = wallet.name;
+        icon = Icons.account_balance_wallet;
+        iconColor = Colors.orange;
+      }
+
+      // Return a styled tile showing the selected method.
+      return Card(
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 1,
+        child: ListTile(
+          leading: Icon(icon, color: iconColor),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+          trailing: TextButton(
+            onPressed: _selectPaymentMethod, // Allow user to change selection
+            child: const Text("Change", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+          ),
+        ),
+      );
+    }
+    // Case 2: No payment method is selected yet.
+    else {
+      return _addNewButton("Choose Payment Method", _selectPaymentMethod);
+    }
+  }
+
 }

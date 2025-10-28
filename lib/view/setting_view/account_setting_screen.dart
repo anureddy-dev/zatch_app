@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:zatch_app/model/carts_model.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/services/preference_service.dart';
+import 'package:zatch_app/view/category_screen/category_screen.dart';
 import 'package:zatch_app/view/help_screen.dart';
 import 'package:zatch_app/view/order_view/order_screen.dart';
 import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
 import 'package:zatch_app/view/setting_view/profile_screen.dart';
+import 'package:zatch_app/view/zatching_details_screen.dart';
 import 'account_details_screen.dart';
 import 'package:zatch_app/view/policy_screen.dart';
 import 'dart:convert'; // ✅ for jsonEncode()
@@ -171,7 +174,29 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               print("--- Navigated back from AccountDetailsScreen without success signal. No refresh needed. ---");
             }
           }),
-
+          _settingsTile(Icons.shopping_cart, "Zatches", () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ZatchingDetailsScreen(
+                  zatch: Zatch(
+                    id: "3",
+                    name: "Modern light clothes",
+                    description: "Dress modern",
+                    seller: "Neu Fashions, Hyderabad",
+                    imageUrl: "https://picsum.photos/202/300",
+                    active: false,
+                    status: "Offer Rejected",
+                    quotePrice: "212.99 ₹",
+                    sellerPrice: "800 ₹",
+                    quantity: 4,
+                    subTotal: "800 ₹",
+                    date: "Yesterday 12:00PM",
+                  ),
+                ),
+              ),
+            );
+          }),
           _settingsTile(Icons.shopping_cart, "Your Orders", () {
             Navigator.push(
               context,
@@ -192,7 +217,16 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             },
           ),
           _settingsTile(Icons.dark_mode, "Dark Mode", () {}),
-          _settingsTile(Icons.tune, "Change Preferences in shopping", () {}),
+          _settingsTile(Icons.tune, "Change Preferences in shopping", () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(    builder: (_) => CategoryScreen(
+                title: "Your Preferences",
+              ),
+              ),
+            );
+
+          }),
           _settingsTile(Icons.help_outline, "Help", () {
             Navigator.push(
               context,

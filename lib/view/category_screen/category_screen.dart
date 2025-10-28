@@ -8,10 +8,12 @@ import 'package:zatch_app/view/home_page.dart';
 
 class CategoryScreen extends StatefulWidget {
   final LoginResponse? loginResponse;
+  final String? title;
 
   const CategoryScreen({
     super.key,
     this.loginResponse,
+    this.title,
   });
 
   @override
@@ -93,7 +95,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
   @override
   Widget build(BuildContext context) {
     return BaseScreenAlt(
-      title: "Let’s find you\nSomething to shop for.",
+      // ✅ 3. Use the title from the widget property instead of a hardcoded string.
+      title: widget.title ?? "",
       subtitle: "",
       contentWidgets: [
         if (isLoading)
