@@ -4,8 +4,8 @@ import 'package:flutter/services.dart'; // Import for input formatters
 import 'package:flutter_html/flutter_html.dart';
 import 'package:zatch_app/sellersscreens/Daiilogs/common_text_field.dart';
 import 'package:zatch_app/sellersscreens/SellHomeScreen.dart';
-import 'package:zatch_app/sellersscreens/registration_success_screen.dart';
-import 'package:zatch_app/sellersscreens/seller_status_screen.dart';
+import 'package:zatch_app/sellersscreens/registration/registration_success_screen.dart';
+import 'package:zatch_app/sellersscreens/status/seller_status_screen.dart';
 import 'package:zatch_app/services/api_service.dart';
 
 

@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';import 'package:zatch_app/sellersscreens/seller_status_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:zatch_app/sellersscreens/addproduct/add_product_screen.dart';import 'package:zatch_app/sellersscreens/status/seller_status_screen.dart';
 
 class RegistrationSuccessScreen extends StatelessWidget {
   const RegistrationSuccessScreen({super.key});
@@ -25,9 +26,7 @@ class RegistrationSuccessScreen extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Column(
-              // The main column now expands to fill the screen
               children: [
-                // This column contains the content that will be centered
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -73,8 +72,6 @@ class RegistrationSuccessScreen extends StatelessWidget {
                   ),
                 ),
 
-                // This section contains the buttons that will be at the bottom
-                // The SizedBox ensures there is some space from the bottom edge
                 Padding(
                   padding: const EdgeInsets.only(bottom: 20.0),
                   child: Column(
@@ -85,7 +82,7 @@ class RegistrationSuccessScreen extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (context) => const SellerStatusScreen(
-                                status: RegistrationStatus.resumeOnboarding,
+                                status: RegistrationStatus.submitted,
                               ),
                             ),
                           );
@@ -111,8 +108,12 @@ class RegistrationSuccessScreen extends StatelessWidget {
                       const SizedBox(height: 20),
                       ElevatedButton(
                         onPressed: () {
-                          // Add your Add Products flow here
-                        },
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AddProductScreen(),
+                            ),
+                          );                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,

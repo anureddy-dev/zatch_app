@@ -1,10 +1,13 @@
+// lib/model/user_profile_response.dart
+
 class UserProfileResponse {
   final bool success;
   final String message;
   final User user;
 
   UserProfileResponse({
-    required this.success,    required this.message,
+    required this.success,
+    required this.message,
     required this.user,
   });
 
@@ -38,10 +41,8 @@ class User {
   final String gender;
   final String categoryType;
   final ProfilePic profilePic;
-  //final SellerProfile? sellerProfile;
-  //final GlobalBargainSettings? globalBargainSettings;
   final List<dynamic> followers;
-  final List<dynamic> following;
+  final List<FollowedUser> following;
   final int followerCount;
   final int reviewsCount;
   final int productsSoldCount;
@@ -64,8 +65,6 @@ class User {
     required this.gender,
     required this.categoryType,
     required this.profilePic,
-    // required this.sellerProfile,
-    //required this.globalBargainSettings,
     required this.followers,
     required this.following,
     required this.followerCount,
@@ -82,6 +81,34 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // ✅ FIX: Robustly parse the 'following' list.
+    // It can be a list of Objects (Map) or a list of IDs (String).
+    final List<FollowedUser> followingList;
+    final dynamic followingData = json['following'];
+
+    if (followingData is List && followingData.isNotEmpty) {
+      // Check the type of the first element to decide how to parse.
+      if (followingData.first is Map<String, dynamic>) {
+        // Case 1: List contains full user objects.
+        followingList = followingData
+            .map((item) => FollowedUser.fromJson(item as Map<String, dynamic>))
+            .toList();
+      } else if (followingData.first is String) {
+        // Case 2: List contains only user IDs (Strings).
+        // Create partial FollowedUser objects.
+        followingList = followingData
+            .map((id) => FollowedUser(id: id as String, username: '...'))
+            .toList();
+      } else {
+        // Case 3: List contains unexpected data types.
+        followingList = [];
+      }
+    } else {
+      // Case 4: List is null, empty, or not a list.
+      followingList = [];
+    }
+
+
     return User(
       id: json['_id'] ?? '',
       username: json['username'] ?? '',
@@ -92,21 +119,13 @@ class User {
       gender: json['gender'] ?? '',
       categoryType: json['categoryType'] ?? '',
       profilePic: ProfilePic.fromJson(json['profilePic'] ?? {}),
-      /*  sellerProfile: json['sellerProfile'] != null
-          ? SellerProfile.fromJson(json['sellerProfile'])
-          : null,
-      globalBargainSettings: json['globalBargainSettings'] != null
-          ? GlobalBargainSettings.fromJson(json['globalBargainSettings'])
-          : null,*/
       followers: List<dynamic>.from(json['followers'] ?? []),
-      following: List<dynamic>.from(json['following'] ?? []),
+      following: followingList, // Use the safely parsed list
       followerCount: json['followerCount'] ?? 0,
       reviewsCount: json['reviewsCount'] ?? 0,
       productsSoldCount: json['productsSoldCount'] ?? 0,
       customerRating: json['customerRating'] ?? 0,
-      // ⭐️ FIXED: Correctly parse the list of maps into a list of SavedBit objects
       savedBits: List<SavedBit>.from((json["savedBits"] ?? []).map((x) => SavedBit.fromJson(x))),
-      // ⭐️ FIXED: Correctly parse the list of maps into a list of SavedProduct objects
       savedProducts: List<SavedProduct>.from((json["savedProducts"] ?? []).map((x) => SavedProduct.fromJson(x))),
       isAdmin: json['isAdmin'] ?? false,
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
@@ -127,15 +146,12 @@ class User {
       'gender': gender,
       'categoryType': categoryType,
       'profilePic': profilePic.toJson(),
-      //'sellerProfile': sellerProfile?.toJson(),
-      //'globalBargainSettings': globalBargainSettings?.toJson(),
       'followers': followers,
-      'following': following,
+      'following': List<dynamic>.from(following.map((x) => x.toJson())),
       'followerCount': followerCount,
       'reviewsCount': reviewsCount,
       'productsSoldCount': productsSoldCount,
       'customerRating': customerRating,
-      // ⭐️ FIXED: Convert list of objects back to list of maps
       'savedBits': List<dynamic>.from(savedBits.map((x) => x.toJson())),
       'savedProducts': List<dynamic>.from(savedProducts.map((x) => x.toJson())),
       'isAdmin': isAdmin,
@@ -173,149 +189,40 @@ class ProfilePic {
   };
 }
 
-/*
-class SellerProfile {
-  final Address? address;
-  final BankDetails? bankDetails;
-  final String businessName;
-  final List<dynamic> documents;
-  final String gstin;
-  final bool tcAccepted;
-  final String shippingMethod;
+class FollowedUser {
+  final String id;
+  final String username;
+  final String? profilePicUrl;
+  final int productsCount;
 
-  SellerProfile({
-    required this.address,
-    required this.bankDetails,
-    required this.businessName,
-    required this.documents,
-    required this.gstin,
-    required this.tcAccepted,
-    required this.shippingMethod,
+  FollowedUser({
+    required this.id,
+    required this.username,
+    this.profilePicUrl,
+    this.productsCount = 0,
   });
 
-  factory SellerProfile.fromJson(Map<String, dynamic> json) {
-    return SellerProfile(
-      address: json['address'] != null ? Address.fromJson(json['address']) : null,
-      bankDetails:
-      json['bankDetails'] != null ? BankDetails.fromJson(json['bankDetails']) : null,
-      businessName: json['businessName'] ?? '',
-      documents: List<dynamic>.from(json['documents'] ?? []),
-      gstin: json['gstin'] ?? '',
-      tcAccepted: json['tcAccepted'] ?? false,
-      shippingMethod: json['shippingMethod'] ?? '',
+  factory FollowedUser.fromJson(Map<String, dynamic> json) {
+    final profilePic = json['profilePic'] as Map<String, dynamic>? ?? {};
+    final products = json['sellingProducts'] as List? ?? [];
+
+    return FollowedUser(
+      id: json['_id'] ?? '',
+      username: json['username'] ?? 'No Name',
+      profilePicUrl: profilePic['url'],
+      productsCount: products.length,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-    'address': address?.toJson(),
-    'bankDetails': bankDetails?.toJson(),
-    'businessName': businessName,
-    'documents': documents,
-    'gstin': gstin,
-    'tcAccepted': tcAccepted,
-    'shippingMethod': shippingMethod,
-  };
+  Map<String, dynamic> toJson() {
+    return {
+      '_id': id,
+      'username': username,
+      'profilePic': {'url': profilePicUrl},
+      'sellingProducts': List.generate(productsCount, (_) => {}),
+    };
+  }
 }
 
-*//*class Address {
-  final String pickupAddress;
-  final String billingAddress;
-  final String pinCode;
-  final String state;
-  final double latitude;
-  final double longitude;
-
-  Address({
-    required this.pickupAddress,
-    required this.billingAddress,
-    required this.pinCode,
-    required this.state,
-    required this.latitude,
-    required this.longitude,
-  });
-
-  factory Address.fromJson(Map<String, dynamic> json) {
-    return Address(
-      pickupAddress: json['pickupAddress'] ?? '',
-      billingAddress: json['billingAddress'] ?? '',
-      pinCode: json['pinCode'] ?? '',
-      state: json['state'] ?? '',
-      latitude: (json['latitude'] ?? 0).toDouble(),
-      longitude: (json['longitude'] ?? 0).toDouble(),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'pickupAddress': pickupAddress,
-    'billingAddress': billingAddress,
-    'pinCode': pinCode,
-    'state': state,
-    'latitude': latitude,
-    'longitude': longitude,
-  };
-}*//*
-
-class BankDetails {
-  final String accountHolderName;
-  final String accountNumber;
-  final String ifscCode;
-  final String bankName;
-  final String upiId;
-
-  BankDetails({
-    required this.accountHolderName,
-    required this.accountNumber,
-    required this.ifscCode,
-    required this.bankName,
-    required this.upiId,
-  });
-
-  factory BankDetails.fromJson(Map<String, dynamic> json) {
-    return BankDetails(
-      accountHolderName: json['accountHolderName'] ?? '',
-      accountNumber: json['accountNumber'] ?? '',
-      ifscCode: json['ifscCode'] ?? '',
-      bankName: json['bankName'] ?? '',
-      upiId: json['upiId'] ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'accountHolderName': accountHolderName,
-    'accountNumber': accountNumber,
-    'ifscCode': ifscCode,
-    'bankName': bankName,
-    'upiId': upiId,
-  };
-}
-
-class GlobalBargainSettings {
-  final bool enabled;
-  final int autoAcceptDiscount;
-  final int maximumDiscount;
-
-  GlobalBargainSettings({
-    required this.enabled,
-    required this.autoAcceptDiscount,
-    required this.maximumDiscount,
-  });
-
-  factory GlobalBargainSettings.fromJson(Map<String, dynamic> json) {
-    return GlobalBargainSettings(
-      enabled: json['enabled'] ?? false,
-      autoAcceptDiscount: json['autoAcceptDiscount'] ?? 0,
-      maximumDiscount: json['maximumDiscount'] ?? 0,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'enabled': enabled,
-    'autoAcceptDiscount': autoAcceptDiscount,
-    'maximumDiscount': maximumDiscount,
-  };
-}*/
-
-// ⭐️ ADDED: The required classes are now included in this file. ⭐️
 class SavedBit {
   final BitVideo video;
   final String id;

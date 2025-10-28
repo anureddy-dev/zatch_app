@@ -1,8 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:zatch_app/sellersscreens/faq_screen.dart';
-import 'package:zatch_app/sellersscreens/seller_registration_screen.dart';
-import 'package:zatch_app/sellersscreens/seller_status_screen.dart';
+import 'package:zatch_app/sellersscreens/registration/seller_registration_screen.dart';
+import 'package:zatch_app/sellersscreens/status/seller_status_screen.dart';
 
 // Data Model for a selling benefit.
 class SellBenefit {

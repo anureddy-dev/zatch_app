@@ -2,7 +2,9 @@
 // Enum to define the possible registration states
 import 'package:flutter/material.dart';
 import 'package:zatch_app/sellersscreens/SellHomeScreen.dart';
-import 'package:zatch_app/sellersscreens/seller_registration_screen.dart';
+import 'package:zatch_app/sellersscreens/addproduct/add_product_screen.dart';
+import 'package:zatch_app/sellersscreens/sellerdashbord/SellerDashboardScreen.dart';
+import 'package:zatch_app/sellersscreens/registration/seller_registration_screen.dart';
 
 enum RegistrationStatus {
   resumeOnboarding,
@@ -226,6 +228,20 @@ class SellerStatusScreen extends StatelessWidget {
     VoidCallback? secondaryButtonAction;
     String? footerText;
 
+    void navigateToAddProduct() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AddProductScreen()),
+      );
+    }
+
+    void navigateToDashboard() {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const SellerDashboardScreen()),
+            (route) => false,
+      );
+    }
+
     switch (status) {
       case RegistrationStatus.resumeOnboarding:
         mainButtonText = 'Resume Application';
@@ -246,35 +262,23 @@ class SellerStatusScreen extends StatelessWidget {
         break;
       case RegistrationStatus.approved:
         mainButtonText = 'Add Products';
-        mainButtonAction = () {
-          /* TODO: Navigate to Add Products */
-        };
+        mainButtonAction = navigateToAddProduct;
         secondaryButtonText = 'Start Selling';
-        secondaryButtonAction = () {
-          /* TODO: Navigate to Home/Dashboard */
-        };
+        secondaryButtonAction = navigateToDashboard;
         footerText = null;
         break;
       case RegistrationStatus.unsuccessful:
         mainButtonText = 'Add Products';
-        mainButtonAction = () {
-          /* TODO: Navigate to Add Products */
-        };
+        mainButtonAction = navigateToAddProduct;
         secondaryButtonText = 'Start Selling';
-        secondaryButtonAction = () {
-          /* TODO: Handle start selling */
-        };
+        secondaryButtonAction = navigateToDashboard;
         footerText = '*Payments will be on hold until verification is complete';
         break;
       case RegistrationStatus.submitted:
       mainButtonText = 'Add Products';
-        mainButtonAction = () {
-          /* TODO: Navigate to Add Products */
-        };
-        secondaryButtonText = 'Start Selling';
-        secondaryButtonAction = () {
-
-        };
+      mainButtonAction = navigateToAddProduct;
+      secondaryButtonText = 'Start Selling';
+      secondaryButtonAction = navigateToDashboard;
         footerText = '*Payments will be on hold until verification is complete';
     }
 

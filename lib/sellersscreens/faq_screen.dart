@@ -1,6 +1,7 @@
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:zatch_app/sellersscreens/model/faq_item.dart';
 
 class FaqScreen extends StatelessWidget {
@@ -45,6 +46,26 @@ class FaqScreen extends StatelessWidget {
       answer: 'This is the answer about the tax policy.',
     ),
   ];
+  void _sendEmail(BuildContext context) async { // Pass BuildContext
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: 'Zatchshop@gmail.com',
+      queryParameters: {
+        'subject': 'Help Request from Zatch App',
+      },
+    );
+
+    if (await canLaunchUrl(emailLaunchUri)) {
+      await launchUrl(emailLaunchUri);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open email app. Is one installed?'),
+        ),
+      );
+      print('Could not launch ${emailLaunchUri.toString()}');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +85,7 @@ class FaqScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomHelpSection(),
+      bottomNavigationBar: _buildBottomHelpSection(context),
     );
   }
 
@@ -178,7 +199,7 @@ class FaqScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomHelpSection() {
+  Widget _buildBottomHelpSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
       decoration: BoxDecoration(
@@ -212,9 +233,7 @@ class FaqScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onPressed: () {
-              // TODO: Implement send message action
-            },
+            onPressed: () => _sendEmail(context),
             child: const Text(
               'Send a Message',
               style: TextStyle(

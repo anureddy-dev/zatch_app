@@ -267,18 +267,17 @@ class ApiService {
     }
   }
 
-  /// LIVE SESSIONS
   Future<LiveSessionsResponse> getLiveSessions() async {
-    const String liveSessionsUrl = "https://zatch-e9ye.onrender.com/api/live/sessions";
+    const String liveSessionsEndpoint = "/live/sessions";
+
     try {
-      final response = await _dio.get(liveSessionsUrl);
+      final response = await _dio.get(liveSessionsEndpoint);
       final data = _decodeResponse(response.data);
 
       if (data is Map<String, dynamic>) {
         return LiveSessionsResponse.fromJson(data);
       } else {
-        print("Error: Expected a Map for LiveSessionsResponse but got ${data
-            .runtimeType}");
+        print("Error: Expected a Map for LiveSessionsResponse but got ${data.runtimeType}");
         throw Exception("Invalid data format received for live sessions.");
       }
     } on DioException catch (e) {
@@ -291,7 +290,7 @@ class ApiService {
 
   /// JOIN LIVE SESSION
   Future<dynamic> joinLiveSession(String username) async {
-    final String joinUrl = "https://zatch-e9ye.onrender.com/api/live/session/$username/join";
+    final String joinUrl = "https://zatch-e9ye.onrender.com/api/v1/live/session/$username/join";
 
     try {
       debugPrint("🔹 Joining live session for user: $username");
@@ -778,6 +777,30 @@ class ApiService {
       }
     } catch (e) {
       throw Exception("Error fetching terms: $e");
+    }
+  }
+  Future<Map<String, dynamic>> submitProductStep(Map<String, dynamic> payload) async {
+    try {
+      debugPrint("🔹 Submitting Product Step ${payload['step']} -> $payload");
+
+      const String productCreateUrl = "/product/create";
+
+      final response = await _dio.post(
+        productCreateUrl,
+        data: payload,
+      );
+
+      final data = _decodeResponse(response.data);
+      debugPrint("✅ Product Step ${payload['step']} Response: $data");
+
+      if (data is Map<String, dynamic> && data['success'] == true) {
+        return data;
+      } else {
+        throw Exception(data['message'] ?? 'API returned success=false');
+      }
+    } on DioException catch (e) {
+      debugPrint("❌ Product Step ${payload['step']} Error: ${e.response?.data}");
+      throw Exception(_handleError(e));
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
 import 'package:zatch_app/services/api_service.dart';
+import 'package:zatch_app/view/profile/following_list_screen.dart';
 
 import '../../controller/live_stream_controller.dart';
 import '../ReelDetailsScreen.dart';
@@ -94,25 +95,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                   child: Column(
                     children: [
                       const SizedBox(height: 60),
-
-                      // ✅ Name
                       Text(
                         name,
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 6),
-
-                      // ✅ Followers
-                      GestureDetector(
-                        onTap: () {
-                          // ⭐️ FIXED HERE: Navigation is now enabled ⭐️
-                          /*Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const FollowingListScreen(),
+                      GestureDetector(onTap: (){
+                        if (user == null || !mounted) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FollowingScreen(
+                              followedUsers: user.following,
                             ),
-                          );*/
-                        },
+                          ),
+                        );
+                      },
                         child: Text(
                           "$followers Sellers Following",
                           style: const TextStyle(fontSize: 14, color: Colors.grey),

@@ -31,7 +31,6 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isFollowing = false;
   bool _isSharing = false;
   bool _isFollowLoading = false;
-  // late Zatch zatch; // This was unused and has been removed.
 
   @override
   void initState() {
@@ -470,16 +469,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,        // Two columns
-        mainAxisSpacing: 24,      // Vertical spacing between cards
-        crossAxisSpacing: 16,     // Horizontal spacing between cards
+        crossAxisCount: 2,
+        mainAxisSpacing: 24,
+        crossAxisSpacing: 16,
         childAspectRatio: 179 / 300, // Aspect ratio from Figma design (width / (image_height + text_height))
       ),
       itemCount: liveEvents.length,
       itemBuilder: (context, index) {
         final event = liveEvents[index];
-        // The GestureDetector for navigation now wraps the stateful _LiveEventCard.
-        // The onTap for the card itself remains unchanged.
         return GestureDetector(
           onTap: () {
             final session = Session(
