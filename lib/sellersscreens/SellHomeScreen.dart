@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:zatch_app/sellersscreens/faq_screen.dart';
 import 'package:zatch_app/sellersscreens/registration/seller_registration_screen.dart';
+import 'package:zatch_app/sellersscreens/sellerdashbord/SellerDashboardScreen.dart';
 import 'package:zatch_app/sellersscreens/status/seller_status_screen.dart';
 
 // Data Model for a selling benefit.
@@ -242,18 +243,14 @@ class SellHomeScreen extends StatelessWidget {
         // The main button
         GestureDetector(
           onTap: () {
-            Navigator.push(
+          /*  Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => SellerRegistrationScreen()),
-            );
-          /*  Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const SellerStatusScreen(
-                  status: RegistrationStatus.submitted
-                ),
-              ),
             );*/
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => SellerDashboardScreen()),
+            );
             print("Become a Seller tapped");
           },
           child: Container(

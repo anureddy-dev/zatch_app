@@ -29,7 +29,7 @@ class CategoriesResponse {
 class Category {
   final String id;
   final String name;
-  final String easyname;
+  final String? easyname; 
   final String? description;
   final String? iconUrl;
   final String? bannerImageUrl;
@@ -41,11 +41,12 @@ class Category {
   final String? updatedAt;
   final CategoryImage? image;
   final String? slug;
+  final List<SubCategory>? subCategories;
 
   Category({
     required this.id,
     required this.name,
-    required this.easyname,
+    this.easyname,
     this.description,
     this.iconUrl,
     this.bannerImageUrl,
@@ -57,13 +58,23 @@ class Category {
     this.updatedAt,
     this.image,
     this.slug,
-  });
+    required List<SubCategory> subCategories,
+  }) : this.subCategories = subCategories.isEmpty
+      ? [
+    SubCategory(
+      id: 'dummy-id-$id',
+      name: 'No Sub-category',
+      slug: 'no-subcategory',
+      createdAt: DateTime.now().toIso8601String(),
+    )
+  ]
+      : subCategories;
 
   factory Category.fromJson(Map<String, dynamic> json) {
     return Category(
       id: json['_id'] ?? '',
       name: json['name'] ?? '',
-      easyname: json['easyname'] ?? '',
+      easyname: json['easyname'], // Nullable now
       description: json['description'],
       iconUrl: json['iconUrl'],
       bannerImageUrl: json['bannerImageUrl'],
@@ -77,10 +88,12 @@ class Category {
           : null,
       createdAt: json['createdAt'],
       updatedAt: json['updatedAt'],
-      image: json['image'] != null
-          ? CategoryImage.fromJson(json['image'])
-          : null,
+      image:
+      json['image'] != null ? CategoryImage.fromJson(json['image']) : null,
       slug: json['slug'],
+      subCategories: (json['subCategories'] as List<dynamic>? ?? [])
+          .map((e) => SubCategory.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -99,6 +112,45 @@ class Category {
     'updatedAt': updatedAt,
     'image': image?.toJson(),
     'slug': slug,
+    'subCategories': subCategories
+        ?.where((sub) => !sub.id.startsWith('dummy-id'))
+        .map((e) => e.toJson())
+        .toList(),
+  };
+}
+
+class SubCategory {
+  final String id;
+  final String name;
+  final String slug;
+  final String createdAt;
+  final CategoryImage? image;
+
+  SubCategory({
+    required this.id,
+    required this.name,
+    required this.slug,
+    required this.createdAt,
+    this.image,
+  });
+
+  factory SubCategory.fromJson(Map<String, dynamic> json) {
+    return SubCategory(
+      id: json['_id'] ?? '',
+      name: json['name'] ?? '',
+      slug: json['slug'] ?? '',
+      createdAt: json['createdAt'] ?? '',
+      image:
+      json['image'] != null ? CategoryImage.fromJson(json['image']) : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    '_id': id,
+    'name': name,
+    'slug': slug,
+    'createdAt': createdAt,
+    'image': image?.toJson(),
   };
 }
 

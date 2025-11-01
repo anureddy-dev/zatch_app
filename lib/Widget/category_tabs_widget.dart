@@ -67,7 +67,7 @@ class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
 
       final exploreAll = allCategories.firstWhere(
             (c) => c.name.toLowerCase() == "explore all",
-        orElse: () => Category(name: "Explore All", id: "", easyname: ""),
+        orElse: () => Category(name: "Explore All", id: "", easyname: "", subCategories: []),
       );
 
       // Remaining categories (excluding selected and Explore All)

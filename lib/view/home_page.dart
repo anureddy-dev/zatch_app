@@ -70,7 +70,7 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           final exploreAllCategory = Category(
             id: "0",
-            easyname: 'Explore All', name: 'Explore All',
+            easyname: 'Explore All', name: 'Explore All', subCategories: [],
           );
           _allCategories = [exploreAllCategory, ...fetched];
           _selectedCategory = _allCategories.first;

@@ -87,13 +87,13 @@ class _LoginScreenState extends State<LoginScreen> {
       final savedCategories = prefs.getStringList("userCategories");
       print("Selected categories: $savedCategories");
 
-      if (savedCategories == null || savedCategories.isEmpty) {        print("Navigating to CategoryScreen");
-      // Keep the original title for the onboarding flow
+      if (savedCategories == null || savedCategories.isEmpty) {
+      print("Navigating to CategoryScreen");
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => CategoryScreen(
-            title: "Let’s find you\nSomething to shop for.", // Pass the title here
+            title: "Let’s find you\nSomething to shop for.",
             loginResponse: res,
           ),
         ),
