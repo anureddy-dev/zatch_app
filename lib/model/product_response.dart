@@ -1,5 +1,7 @@
 import 'package:zatch_app/model/categories_response.dart';
 
+import 'ExploreApiRes.dart';
+
 class ProductResponse {
   final bool success;
   final String message;
@@ -29,7 +31,7 @@ class Product {
   final double price;
   final List<ProductImage> images;
   final Category? category;
-   int? stock;
+  final int? stock;
   final String? condition;
   final String? color;
   final String? size;
@@ -37,9 +39,13 @@ class Product {
   final String? info2;
   final bool? isTopPick;
   final int? saveCount;
-        int? likeCount;
+  int? likeCount;
   final int? viewCount;
   final String? sellerId;
+  final List<Review> reviews;
+  final List<Comment>? comments;
+  final int? commentCount;
+  final double? averageRating;
 
   Product({
     required this.id,
@@ -47,6 +53,7 @@ class Product {
     required this.description,
     required this.price,
     required this.images,
+    required this.reviews,
     this.category,
     this.stock,
     this.condition,
@@ -59,6 +66,9 @@ class Product {
     this.likeCount,
     this.viewCount,
     this.sellerId,
+    this.commentCount,
+    this.comments,
+    this.averageRating,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -66,6 +76,7 @@ class Product {
       id: json['_id'] ?? '',
       name: json['name'] ?? '',
       description: json['description'] ?? '',
+      // Handles both int and double for price
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       images: (json['images'] as List<dynamic>? ?? [])
           .map((e) => ProductImage.fromJson(e))
@@ -86,6 +97,15 @@ class Product {
       likeCount: json['likeCount'] ?? 0,
       viewCount: json['viewCount'] ?? 0,
       sellerId: json['sellerId'],
+      averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0.0,
+      reviews: (json['reviews'] as List<dynamic>? ?? [])
+          .map((e) => Review.fromJson(e))
+          .toList(),
+      commentCount: json['commentCount'] ?? 0,
+      // The JSON has an empty 'comments' array, so we parse it.
+      comments: (json['comments'] as List<dynamic>? ?? [])
+          .map((e) => Comment.fromJson(e))
+          .toList(),
     );
   }
 
@@ -116,6 +136,69 @@ class ProductImage {
       publicId: json['public_id'] ?? '',
       url: json['url'] ?? '',
       id: json['_id'] ?? '',
+    );
+  }
+}
+
+class Review {
+  final String id;
+  final Reviewer reviewerId;
+  final int rating;
+  final String comment;
+  final DateTime createdAt;
+
+  Review({
+    required this.id,
+    required this.reviewerId,
+    required this.rating,
+    required this.comment,
+    required this.createdAt,
+  });
+
+  factory Review.fromJson(Map<String, dynamic> json) {
+    return Review(
+      id: json['_id'] ?? '',
+      reviewerId: Reviewer.fromJson(json['reviewerId'] ?? {}),
+      rating: (json['rating'] as num?)?.toInt() ?? 0,
+      comment: json['comment'] ?? '',
+      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+    );
+  }
+}
+
+class Reviewer {
+  final ProfilePic profilePic;
+  final String id;
+  final String username;
+
+  Reviewer({
+    required this.profilePic,
+    required this.id,
+    required this.username,
+  });
+
+  factory Reviewer.fromJson(Map<String, dynamic> json) {
+    return Reviewer(
+      profilePic: ProfilePic.fromJson(json['profilePic'] ?? {}),
+      id: json['_id'] ?? '',
+      username: json['username'] ?? '',
+    );
+  }
+}
+
+class ProfilePic {
+  final String publicId;
+  final String url;
+
+  ProfilePic({
+    required this.publicId,
+    required this.url,
+  });
+
+  factory ProfilePic.fromJson(Map<String, dynamic> json) {
+    return ProfilePic(
+      publicId: json['public_id'] ?? '',
+      url: json['url'] ?? '',
     );
   }
 }

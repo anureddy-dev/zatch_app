@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zatch_app/controller/auth_controller/login_controller.dart';
+import 'package:zatch_app/model/login_response.dart';
 import 'package:zatch_app/view/category_screen/category_screen.dart';
 import 'package:zatch_app/view/home_page.dart';
 import '../../utils/auth_utils/base_screen.dart';
@@ -19,7 +20,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
-  String _selectedCountryCode = "+91";
+  LoginResponse? _lastLoginResponse;
+  String _selectedCountryCode = "91";
 
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -74,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
         countryCode: countryCode,
       );
-
+      _lastLoginResponse =res;
       print("Login response: $res");
       if (!mounted) return;
 
@@ -108,6 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       print("Login error: $e");
+      _lastLoginResponse = null;
       // Use the new message function for API or other errors
       _showMessage("Login Failed", e.toString(), isError: true);
     } finally {
@@ -129,12 +132,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
       print("OTP request -> phone: $phone, countryCode: $countryCode");
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => OtpScreen(phoneNumber: phone, countryCode: countryCode),
-        ),
-      );
+      if (_lastLoginResponse != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                OtpScreen(
+                  phoneNumber: phone,
+                  countryCode: countryCode,
+                  loginResponse: _lastLoginResponse!,
+                ),
+          ),
+        );
+      }
     } catch (e) {
       print("OTP login error: $e");
       _showMessage("OTP Failed", e.toString(), isError: true);

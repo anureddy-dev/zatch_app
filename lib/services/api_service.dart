@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/ExploreApiRes.dart';
+import 'package:zatch_app/model/SaveBitResponse.dart';
+import 'package:zatch_app/model/SaveProductResponse.dart';
 import 'package:zatch_app/model/SearchHistoryResponse.dart';
 import 'package:zatch_app/model/SearchResultUser.dart';
 import 'package:zatch_app/model/TrendingBit.dart';
@@ -9,6 +11,7 @@ import 'package:zatch_app/model/UpdateProfileResponse.dart';
 import 'package:zatch_app/model/api_response.dart';
 import 'package:zatch_app/model/bit_details.dart';
 import 'package:zatch_app/model/follow_response.dart';
+import 'package:zatch_app/model/live_comment.dart';
 import 'package:zatch_app/model/live_session_res.dart';
 import 'package:zatch_app/model/product_response.dart';
 import 'package:zatch_app/model/register_req.dart';
@@ -198,24 +201,24 @@ class ApiService {
   }
 
   /// VERIFY OTP
-  Future<VerifyOtpResponse> verifyOtp(VerifyOtpRequest request) async {
+  Future<VerifyApiResponse> verifyOtp(VerifyOtpRequest request) async {
     try {
       final response = await _dio.post(
           "/twilio-sms/verify-otp", data: request.toJson());
       final data = _decodeResponse(response.data);
-      return VerifyOtpResponse.fromJson(data);
+      return VerifyApiResponse.fromJson(data);
     } on DioException catch (e) {
       throw Exception(_handleError(e));
     }
   }
 
   /// SEND OTP
-  Future<SendOtpResponse> sendOtp(SendOtpRequest request) async {
+  Future<ResponseApi> sendOtp(SendOtpRequest request) async {
     try {
       final response = await _dio.post(
           "/twilio-sms/send-otp", data: request.toJson());
       final data = _decodeResponse(response.data);
-      return SendOtpResponse.fromJson(data);
+      return ResponseApi.fromJson(response.data);
     } on DioException catch (e) {
       throw Exception(_handleError(e));
     }
@@ -288,31 +291,20 @@ class ApiService {
     }
   }
 
-  /// JOIN LIVE SESSION
-  Future<dynamic> joinLiveSession(String username) async {
-    final String joinUrl = "https://zatch-e9ye.onrender.com/api/v1/live/session/$username/join";
-
+  Future<dynamic> joinLiveSession(String sessionId) async {
+    final String joinEndpoint = "/live/session/$sessionId/join";
     try {
-      debugPrint("🔹 Joining live session for user: $username");
+      debugPrint("🔹 Joining live session with ID: $sessionId");
+      final response = await _dio.post(joinEndpoint);
+      debugPrint("Successfully joined live session $sessionId");
+      return _decodeResponse(response.data);
 
-      final response = await _dio.post(joinUrl);
-
-      if (response.statusCode == 200) {
-        debugPrint("Successfully joined live session for $username");
-        debugPrint("API Response: ${response.data}");
-        return response.data; // <-- return the response
-      } else {
-        debugPrint(
-            "Failed to join live session (${response.statusCode}): ${response
-                .data}");
-        throw Exception("Failed to join live session");
-      }
     } on DioException catch (e) {
       debugPrint("joinLiveSession DioException: ${e.response?.data}");
       throw Exception(_handleError(e));
     } catch (e) {
       debugPrint("Unexpected error joining live session: $e");
-      throw Exception("Error joining live session: $e");
+      throw Exception("An unexpected error occurred while joining the session.");
     }
   }
 
@@ -323,6 +315,7 @@ class ApiService {
       final response = await _dio.post("/user/$targetUserId/toggleFollow");
 
       final data = _decodeResponse(response.data);
+      print("✅ [API_SERVICE] Decoded Data for toggleFollow: $data");
       return FollowResponse.fromJson(data);
     } on DioException catch (e) {
       debugPrint("toggleFollowUser DioException: ${e.response?.data}");
@@ -666,14 +659,14 @@ class ApiService {
     }
   }
 
-  Future<UserProfile> getUserProfileById(String userId) async {
+  Future<UserProfileResponse> getUserProfileById(String userId) async {
     try {
       debugPrint("🔹 Fetching profile for userId: $userId");
       final response = await _dio.get("/user/profile/$userId");
 
       if (response.statusCode == 200 && response.data["success"] == true) {
         debugPrint("✅ Other user profile fetched");
-        return UserProfile.fromJson(response.data);
+        return UserProfileResponse.fromJson(response.data);
       } else {
         throw Exception(response.data["message"] ?? "Failed to fetch profile");
       }
@@ -827,15 +820,24 @@ class ApiService {
     }
   }
 
-  Future<int> toggleLike(String bitId) async {
+  Future<Map<String, dynamic>> toggleLike(String bitId) async {
     try {
       final response = await _dio.post("/bits/$bitId/toggleLike");
       final data = _decodeResponse(response.data);
-      if (data['success'] == true && data.containsKey('likeCount')) {
-        debugPrint("Successfully toggled like for bit: $bitId. New count: ${data['likeCount']}");
-        return data['likeCount'] as int;
+      if (data['success'] == true && data.containsKey('likeCount') && data.containsKey('message')) {
+        final int likeCount = data['likeCount'] as int;
+        final String message = data['message'] as String;
+         final bool isLiked = message.toLowerCase().contains("liked");
+
+        debugPrint("Successfully toggled like for bit: $bitId. New count: $likeCount, isLiked: $isLiked");
+        return {
+          'likeCount': likeCount,
+          'isLiked': isLiked,
+        };
+
       } else {
-        throw Exception(data['message'] ?? 'Failed to toggle like status');
+        // If the response format is unexpected, throw an error.
+        throw Exception(data['message'] ?? 'Failed to toggle like status or invalid response format');
       }
     } on DioException catch (e) {
       debugPrint("API Error toggling like for bit $bitId: ${e.response?.data}");
@@ -845,6 +847,7 @@ class ApiService {
       rethrow;
     }
   }
+
   Future<int> toggleLikeProduct(String productId) async {
     try {
       final response = await _dio.post("/product/$productId/like");
@@ -876,6 +879,135 @@ class ApiService {
       rethrow;
     }
   }
+  Future<SaveProductResponse> toggleSaveProduct(String productId) async {
+    try {
+      final response = await _dio.post("/product/$productId/save");
+      final data = _decodeResponse(response.data);
+      return SaveProductResponse.fromJson(data);
+    } on DioException catch (e) {
+      debugPrint("API Error toggling save for product $productId: ${e.response?.data}");
+      throw Exception(_handleError(e));
+    } catch (e) {
+      debugPrint("Unexpected error toggling save for product $productId: $e");
+      rethrow;
+    }
+  }
+  Future<SaveBitResponse> toggleSaveBit(String bitId) async {
+    try {
+      final response = await _dio.post("/bits/$bitId/save");
+      final data = _decodeResponse(response.data);
+      return SaveBitResponse.fromJson(data);
+    } on DioException catch (e) {
+      debugPrint("API Error toggling save for bit $bitId: ${e.response?.data}");
+      throw Exception(_handleError(e));
+    } catch (e) {
+      debugPrint("Unexpected error toggling save for bit $bitId: $e");
+      rethrow;
+    }
+  }
+  Future<Comment> addCommentToBit(String bitId, String text) async {
+    final String commentEndpoint = "/bits/$bitId/comments";
+
+    try {
+      final response = await _dio.post(
+        commentEndpoint,
+        data: {'text': text},
+      );
+
+      final data = _decodeResponse(response.data);
+
+      if (data is Map<String, dynamic> && data['success'] == true) {
+        return Comment.fromJson(data['comment']);
+      } else {
+        throw Exception("Failed to parse comment response.");
+      }
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    } catch (e) {
+      debugPrint("Error posting comment: $e");
+      throw Exception("Could not post comment. Please try again.");
+    }
+  }
+
+  Future<SessionDetails> getLiveSessionDetails(String sessionId) async {
+    final String detailsEndpoint = "/live/session/$sessionId/details";
+    try {
+      final response = await _dio.get(detailsEndpoint);
+      final decodedData = _decodeResponse(response.data);
+
+      if (decodedData['success'] == true && decodedData['sessionDetails'] != null) {
+        return SessionDetails.fromJson(decodedData['sessionDetails']);
+      } else {
+        throw Exception(decodedData['message'] ?? "Failed to get live session details.");
+      }
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    } catch (e) {
+      throw Exception("Error fetching session details: $e");
+    }
+  }
+  Future<List<LiveComment>> getLiveSessionComments(String sessionId, {int limit = 20, int offset = 0}) async {
+    final String commentsEndpoint = "/live/session/$sessionId/comments?limit=$limit&offset=$offset";
+    try {
+      final response = await _dio.get(commentsEndpoint);
+      final data = _decodeResponse(response.data);
+      if (data is Map<String, dynamic> && data['success'] == true) {
+        final commentsList = data['comments'] as List<dynamic>? ?? [];
+        return commentsList.map((c) => LiveComment.fromJson(c)).toList();
+      } else {
+        throw Exception("Failed to fetch live session comments.");
+      }
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    } catch (e) {
+      throw Exception("Error fetching comments: $e");
+    }
+  }
+
+  Future<LiveComment> postLiveComment(String sessionId, String text) async {
+     final String commentEndpoint = "/live/session/$sessionId/comment";
+
+    try {
+      final response = await _dio.post(
+        commentEndpoint,
+        data: {'text': text},
+      );
+
+      final data = _decodeResponse(response.data);
+
+      if (data is Map<String, dynamic> && data['success'] == true) {
+        if (data['comment'] is Map<String, dynamic>) {
+          return LiveComment.fromJson(data['comment']);
+        } else {
+          throw Exception("API response is missing the 'comment' object.");
+        }
+      } else {
+        throw Exception(data['message'] ?? "Failed to post comment.");
+      }
+    } on DioException catch (e) {
+      throw Exception(_handleError(e));
+    } catch (e) {
+      throw Exception("Error posting comment: $e");
+    }
+  }
+
+  Future<String> shareBit(String bitId) async {
+    try {
+      final response = await _dio.get("/bits/$bitId/share");
+      final data = _decodeResponse(response.data);
+
+      if (data['success'] == true && data['shareLink'] != null) {
+        return data['shareLink'] as String;
+      } else {
+        return "https://zatch.live/bits/$bitId";
+      }
+    } catch (e) {
+      print("Failed to fetch share link: $e");
+      return "https://zatch.live/bits/$bitId";
+    }
+  }
+
+
 
 
 }

@@ -29,10 +29,11 @@ class CategoriesResponse {
 class Category {
   final String id;
   final String name;
-  final String? easyname; 
+  final String? easyname;
   final String? description;
   final String? iconUrl;
   final String? bannerImageUrl;
+  // FIX: Made these fields nullable as they are not always present
   final int? sortOrder;
   final bool? isActive;
   final bool? showOnHomeChip;
@@ -42,6 +43,7 @@ class Category {
   final CategoryImage? image;
   final String? slug;
   final List<SubCategory>? subCategories;
+  final int? v; // FIX: Added the missing '__v' field as nullable
 
   Category({
     required this.id,
@@ -58,34 +60,23 @@ class Category {
     this.updatedAt,
     this.image,
     this.slug,
-    required List<SubCategory> subCategories,
-  }) : this.subCategories = subCategories.isEmpty
-      ? [
-    SubCategory(
-      id: 'dummy-id-$id',
-      name: 'No Sub-category',
-      slug: 'no-subcategory',
-      createdAt: DateTime.now().toIso8601String(),
-    )
-  ]
-      : subCategories;
+    this.subCategories, // FIX: Made subCategories nullable
+    this.v,
+  });
 
   factory Category.fromJson(Map<String, dynamic> json) {
     return Category(
       id: json['_id'] ?? '',
       name: json['name'] ?? '',
-      easyname: json['easyname'], // Nullable now
+      easyname: json['easyname'],
       description: json['description'],
       iconUrl: json['iconUrl'],
       bannerImageUrl: json['bannerImageUrl'],
-      sortOrder: json['sortOrder'] != null
-          ? int.tryParse(json['sortOrder'].toString())
-          : null,
+      // FIX: Safely parse sortOrder and other optional fields
+      sortOrder: json['sortOrder'],
       isActive: json['isActive'],
       showOnHomeChip: json['showOnHomeChip'],
-      priority: json['priority'] != null
-          ? int.tryParse(json['priority'].toString())
-          : null,
+      priority: json['priority'],
       createdAt: json['createdAt'],
       updatedAt: json['updatedAt'],
       image:
@@ -94,6 +85,7 @@ class Category {
       subCategories: (json['subCategories'] as List<dynamic>? ?? [])
           .map((e) => SubCategory.fromJson(e as Map<String, dynamic>))
           .toList(),
+      v: json['__v'], // FIX: Parse the '__v' field
     );
   }
 
@@ -112,10 +104,8 @@ class Category {
     'updatedAt': updatedAt,
     'image': image?.toJson(),
     'slug': slug,
-    'subCategories': subCategories
-        ?.where((sub) => !sub.id.startsWith('dummy-id'))
-        .map((e) => e.toJson())
-        .toList(),
+    'subCategories': subCategories?.map((e) => e.toJson()).toList(),
+    '__v': v,
   };
 }
 
@@ -125,6 +115,7 @@ class SubCategory {
   final String slug;
   final String createdAt;
   final CategoryImage? image;
+  final int? v; // FIX: Added the missing '__v' field as nullable
 
   SubCategory({
     required this.id,
@@ -132,6 +123,7 @@ class SubCategory {
     required this.slug,
     required this.createdAt,
     this.image,
+    this.v,
   });
 
   factory SubCategory.fromJson(Map<String, dynamic> json) {
@@ -142,6 +134,7 @@ class SubCategory {
       createdAt: json['createdAt'] ?? '',
       image:
       json['image'] != null ? CategoryImage.fromJson(json['image']) : null,
+      v: json['__v'],
     );
   }
 
@@ -151,6 +144,7 @@ class SubCategory {
     'slug': slug,
     'createdAt': createdAt,
     'image': image?.toJson(),
+    '__v': v,
   };
 }
 

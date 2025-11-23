@@ -2,6 +2,7 @@ import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zatch_app/controller/auth_controller/otp_controller.dart';
+import 'package:zatch_app/model/verify_otp_response.dart';
 import 'package:zatch_app/view/auth_view/login.dart';
 import '../../utils/auth_utils/base_screen.dart';
 
@@ -65,69 +66,82 @@ class _OtpScreenRegisterState extends State<OtpScreenRegister> {
     ).show(context);
   }
 
-
   /// Auto-send OTP on screen load
   Future<void> _sendOtpOnStart() async {
     setState(() => _isLoading = true);
-    final res = await _otpController.sendOtp(/*widget.phoneNumber*/ "9019058876", widget.countryCode);
+    final apiResponse =
+    await _otpController.sendOtp(/*widget.phoneNumber*/ "9019058876", widget.countryCode);
     if (!mounted) return;
 
     setState(() => _isLoading = false);
-    if (res != null) {
-      _showMessage("Success", "OTP sent to ${res.to}", isError: false);
+    if (apiResponse != null && apiResponse.success) {
+      _showMessage("Success", "OTP sent to ${apiResponse.data.to}",
+          isError: false);
+      _startResendTimer();
     } else {
-      _showMessage("Error", "Failed to send OTP");
+      _showMessage("Error", apiResponse?.message ?? "Failed to send OTP");
     }
-    _startResendTimer();
+  }
+  /// Clears all OTP input fields.
+  void _clearOtpFields() {
+    for (var controller in _controllers) {
+      controller.clear();
+    }
+    // Optionally, move focus back to the first box
+    if (_focusNodes.isNotEmpty) {
+      _focusNodes[0].requestFocus();
+    }
   }
 
   /// Resend OTP
   Future<void> _resendOtp() async {
     if (!_canResend) return;
-
+    _clearOtpFields();
     setState(() {
       _isLoading = true;
       _canResend = false;
     });
 
-    final res = await _otpController.sendOtp(/*widget.phoneNumber*/"9019058876", widget.countryCode);
+    final apiResponse =
+    await _otpController.sendOtp(/*widget.phoneNumber*/ "9019058876", widget.countryCode);
     if (!mounted) return;
 
     setState(() => _isLoading = false);
-    if (res != null) {
-      _showMessage("Success", "OTP resent to ${res.to}", isError: false);
+    if (apiResponse != null && apiResponse.success) {
+      _showMessage("Success", "OTP resent to ${apiResponse.data.to}",
+          isError: false);
+      _startResendTimer();
     } else {
-      _showMessage("Error", "Failed to resend OTP");
+      _showMessage("Error", apiResponse?.message ?? "Failed to resend OTP");
     }
-
-    _startResendTimer();
   }
 
   /// Verify OTP on Register button
   Future<void> _verifyOtp() async {
     final otp = _controllers.map((c) => c.text).join();
     if (otp.length != 4) {
-      _showMessage("Invalid Input", "Please enter the 4-digit OTP");
+      _showMessage("Invalid OTP", "Please enter the complete 4-digit OTP");
       return;
     }
 
     setState(() => _isLoading = true);
-    final res = await _otpController.verifyOtp(/*widget.phoneNumber*/"9019058876", widget.countryCode, otp);
+    final VerifyApiResponse? res = await _otpController.verifyOtp(
+        /*widget.phoneNumber*/"9019058876", widget.countryCode, otp);
+
     if (!mounted) return;
-
     setState(() => _isLoading = false);
-    if (res != null && res.valid == true) {
-      _showMessage("Success", "✅ OTP Verified Successfully", isError: false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => LoginScreen(),
-        ),
-      );
-    } else {
-      _showMessage("Verification Failed", "OTP is incorrect or has expired. Please try again.");
-    }
 
+    if (res != null && res.data.valid == true) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+            (route) => false,
+      );
+      _showMessage("Success", "✅ OTP Verified Successfully", isError: false);
+    } else {
+      _showMessage("Verification Failed",
+          res?.message ?? "The OTP is incorrect or has expired.");
+    }
   }
 
   void _startResendTimer() {

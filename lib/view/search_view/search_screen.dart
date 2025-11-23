@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:video_player/video_player.dart';
 import 'package:zatch_app/controller/live_stream_controller.dart';
 import 'package:zatch_app/model/user_model.dart';
 import 'package:zatch_app/model/product_response.dart';
@@ -16,8 +16,9 @@ import 'package:zatch_app/view/profile/profile_screen.dart';
 // Main Search Screen Widget
 class SearchScreen extends StatefulWidget {
   final UserProfileResponse? userProfile;
+  final bool autoFocus;
 
-  const SearchScreen({super.key, this.userProfile});
+  const SearchScreen({super.key, this.userProfile,this.autoFocus = false,});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -50,9 +51,13 @@ class _SearchScreenState extends State<SearchScreen>
     _loadSearchHistory();
     _fetchInitialData();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      FocusScope.of(context).requestFocus(_searchFocusNode);
-    });
+    if (widget.autoFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          FocusScope.of(context).requestFocus(_searchFocusNode);
+        }
+      });
+    }
   }
 
   Future<void> _fetchInitialData() async {
@@ -63,7 +68,6 @@ class _SearchScreenState extends State<SearchScreen>
       popularSearches =
           searchHistoryResponse.searchHistory.map((e) => e.query).toList();
       final exploreRes = await api.getExploreBits();
-      // MODIFIED: Assign results to both lists initially
       exploreBits = exploreRes;
       _searchResultsBits = exploreRes;
       final peopleRes = await api.getAllUsers();
@@ -165,6 +169,7 @@ class _SearchScreenState extends State<SearchScreen>
         return true;
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         backgroundColor: Colors.white,
         appBar: _buildAppBar(context),
         body: isLoading
@@ -287,7 +292,7 @@ class _SearchScreenState extends State<SearchScreen>
         if (searchHistory.isNotEmpty) _buildLastSearch(),
         if (popularSearches.isNotEmpty) _buildPopularSearch(),
         if (_allProducts.isNotEmpty) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildSection(
             "Products",
             _allProducts.take(4).toList(),
@@ -300,7 +305,7 @@ class _SearchScreenState extends State<SearchScreen>
           ),
         ],
         if (_allPeople.isNotEmpty) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildSection(
             "People",
             _allPeople.take(6).toList(),
@@ -313,7 +318,7 @@ class _SearchScreenState extends State<SearchScreen>
           ),
         ],
         if (exploreBits.isNotEmpty) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildSection(
             "Explore",
             exploreBits,
@@ -343,7 +348,7 @@ class _SearchScreenState extends State<SearchScreen>
             onPressed: _clearSearch,
             child: const Text(
               "Clear All",
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(color: Colors.black),
             ),
           ),
         ],
@@ -353,7 +358,7 @@ class _SearchScreenState extends State<SearchScreen>
         children: searchHistory
             .map(
               (search) => InputChip(
-            label: Text(search),
+            label: Text(search,style: TextStyle(color: Color(0xFF696969)),),
             onPressed: () {
               _searchController.text = search;
               _searchController.selection = TextSelection.fromPosition(
@@ -361,16 +366,18 @@ class _SearchScreenState extends State<SearchScreen>
               );
               _performSearch(search);
             },
-            deleteIcon: const Icon(Icons.close, size: 16),
+            deleteIcon: const Icon(Icons.close, size: 16, color: Color(0xFF696969),),
             onDeleted: () {
               setState(() => searchHistory.remove(search));
               _saveSearchHistory();
             },
+                shape: const StadiumBorder(
+                   side: BorderSide(color: Color(0xFF8B8E97)),
+                ),
           ),
         )
             .toList(),
       ),
-      const SizedBox(height: 20),
     ],
   );
 
@@ -400,60 +407,103 @@ class _SearchScreenState extends State<SearchScreen>
     ],
   );
 
-  // MODIFIED: This widget now accepts a list of bits
   Widget _buildExploreGrid(List<Bits> bits) {
     if (bits.isEmpty) {
       return const Center(heightFactor: 5, child: Text("No bits found."));
     }
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 0.6,
-      ),
-      itemCount: bits.length,
-      itemBuilder: (context, index) {
+    return StaggeredGrid.count(
+      crossAxisCount: 2,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      children: List.generate(bits.length, (index) {
         final bit = bits[index];
-        return GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ReelDetailsScreen(
-                bitId: bit.id,
-                controller: LiveStreamController(),
+        final isTall = index % 3 == 0;
+
+        return StaggeredGridTile.count(
+          crossAxisCellCount: 1,
+          mainAxisCellCount: isTall ? 1.5 : 1,
+          child: GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ReelDetailsScreen(
+                  bitId: bit.id,
+                  controller: LiveStreamController(),
+                ),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    // Use the bit's thumbnail URL if it exists, otherwise a placeholder
+                    bit.thumbnail.publicId ?? "https://placehold.co/300x500",
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.grey.shade300,
+                      child: Icon(
+                        bit.type == 'video'
+                            ? Icons.videocam_off_outlined
+                            : Icons.image_not_supported_outlined,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ),
+
+                  // Overlay with a subtle gradient for text readability
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withOpacity(0.6),
+                            Colors.transparent,
+                            Colors.transparent,
+                          ],
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Display the bit type icon (video or image)
+                  if (bit.type == 'video')
+                    const Center(
+                      child: Icon(
+                        Icons.play_circle_fill,
+                        color: Colors.white70,
+                        size: 40,
+                      ),
+                    ),
+
+                  // Display the title at the bottom
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    right: 8,
+                    child: Text(
+                      bit.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        shadows: [
+                          Shadow(blurRadius: 2, color: Colors.black54)
+                        ],
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // TODO: Replace with actual bit thumbnail if available
-                Image.network(
-                  "https://placehold.co/300x500/000000/FFFFFF?text=Video",
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.grey.shade300,
-                    child: const Icon(Icons.ondemand_video),
-                  ),
-                ),
-                const Center(
-                  child: Icon(
-                    Icons.play_circle_fill,
-                    color: Colors.white70,
-                    size: 40,
-                  ),
-                ),
-              ],
-            ),
-          ),
         );
-      },
+      }),
     );
   }
 
@@ -473,7 +523,14 @@ class _SearchScreenState extends State<SearchScreen>
                 style:
                 const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              TextButton(onPressed: onSeeAll, child: const Text("See All")),
+
+              TextButton(
+                onPressed: onSeeAll,
+                child: const Text("See All"),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.black,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -517,11 +574,16 @@ class _SearchScreenState extends State<SearchScreen>
             controller: _tabController,
             children: [
               _searchAllTab(),
-              _searchPeopleTab(_searchResultsPeople),
-              _searchProductsTab(_searchResultsProducts),
-              // MODIFIED: Use filtered bits in a scrollable view
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: _searchPeopleTab(_searchResultsPeople),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: _searchProductsTab(_searchResultsProducts),
+              ),
               SingleChildScrollView(child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(16),
                 child: _buildExploreGrid(_searchResultsBits),
               )),
             ],
@@ -552,7 +614,6 @@ class _SearchScreenState extends State<SearchScreen>
         _searchPeopleTab(_searchResultsPeople, simple: true),
         const SizedBox(height: 20),
       ],
-      // MODIFIED: Use filtered bits in the "All" tab
       if (_searchResultsBits.isNotEmpty) ...[
         const Text(
           "Buy Bits",
@@ -575,22 +636,7 @@ class _SearchScreenState extends State<SearchScreen>
       itemCount: products.length,
       itemBuilder: (context, index) {
         final product = products[index];
-        return ListTile(
-          leading: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              product.images.isNotEmpty
-                  ? product.images.first.url
-                  : "https://placehold.co/100",
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
-            ),
-          ),
-          title: Text(product.name),
-          subtitle: Text(product.category?.name ?? "Product"),
-          trailing: Text("${product.price} ₹"),
+        return InkWell(
           onTap: () {
             Navigator.push(
               context,
@@ -600,12 +646,112 @@ class _SearchScreenState extends State<SearchScreen>
               ),
             );
           },
+          child: Padding(
+            padding: const EdgeInsets.symmetric( vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Product Image
+                Container(
+                  width: 57,
+                  height: 57,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: ShapeDecoration(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Image.network(
+                    product.images.isNotEmpty
+                        ? product.images.first.url
+                        : "https://placehold.co/95x118",
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.grey.shade200,
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 15),
+
+                // 2. Product Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.name,
+                        style: const TextStyle(
+                          color: Color(0xFF121111),
+                          fontSize: 14,
+                          fontFamily: 'Encode Sans',
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        product.category?.name ?? "Product",
+                        style: const TextStyle(
+                          color: Color(0xFF787676),
+                          fontSize: 10,
+                          fontFamily: 'Encode Sans',
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${product.price} ₹',
+                        style: const TextStyle(
+                          color: Color(0xFF292526),
+                          fontSize: 12,
+                          fontFamily: 'Encode Sans',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (product.isTopPick == true)
+                  Container(
+                    height: 22,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    decoration: ShapeDecoration(
+                      color: const Color(0xFFBBF711),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(48),
+                      ),
+                    ),
+                    child: const Text(
+                      'Trending',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 8,
+                        fontFamily: 'Encode Sans',
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         );
       },
     );
   }
-
+  String _formatFollowerCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    } else {
+      return count.toString();
+    }
+  }
   Widget _searchPeopleTab(List<UserModel> people, {bool simple = false}) {
+
     if (people.isEmpty) {
       return const Center(heightFactor: 5, child: Text("No people found"));
     }
@@ -616,22 +762,75 @@ class _SearchScreenState extends State<SearchScreen>
       itemCount: people.length,
       itemBuilder: (context, index) {
         final user = people[index];
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundImage: (user.profilePic?.url?.isNotEmpty ?? false)
-                ? NetworkImage(user.profilePic!.url!)
-                : null,
-            child: (user.profilePic?.url == null ||
-                user.profilePic!.url!.isEmpty)
-                ? const Icon(Icons.person)
-                : null,
-          ),
-          title: Text(user.displayName),
-          subtitle: Text("${user.followerCount} Followers"),
+        return InkWell(
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ProfileScreen(userId: user.id),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 28.5,
+                  backgroundImage: (user.profilePic?.url?.isNotEmpty ?? false)
+                      ? NetworkImage(user.profilePic!.url!)
+                      : null,
+                  child: (user.profilePic?.url == null || user.profilePic!.url!.isEmpty)
+                      ? const Icon(Icons.person, size: 30, color: Colors.grey)
+                      : null,
+                  backgroundColor: Colors.grey.shade200,
+                ),
+                const SizedBox(width: 15),
+                // 2. User Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        user.displayName,
+                        style: const TextStyle(
+                          color: Color(0xFF121111),
+                          fontSize: 17,
+                          fontFamily: 'Encode Sans',
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: _formatFollowerCount(user.followerCount ?? 0),
+                              style: const TextStyle(
+                                color: Color(0xFF6B6B6B),
+                                fontSize: 12,
+                                fontFamily: 'Encode Sans',
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: ' Followers',
+                              style: TextStyle(
+                                color: Color(0xFF787676),
+                                fontSize: 10,
+                                fontFamily: 'Encode Sans',
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -639,10 +838,6 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 }
-
-// NOTE: The following classes are included for completeness.
-// Consider moving them to their own files.
-
 class ProductListScreen extends StatefulWidget {
   final List<Product> products;
   const ProductListScreen({super.key, required this.products});

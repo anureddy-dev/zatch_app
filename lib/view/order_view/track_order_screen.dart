@@ -94,7 +94,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                             // You might need to add other required fields depending on your model
                             color: "red",
                             size: "M",
-                            likeCount: 5, description: ''
+                            likeCount: 5, description: '', reviews: []
                         );
                         _showBuyOrZatchBottomSheet(context, productToBuy, "buy");
                       },
@@ -404,7 +404,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                     // You might need to add other required fields depending on your model
                     color: "red",
                     size: "M",
-                    likeCount: 5, description: ''
+                    likeCount: 5, description: '', reviews: []
                 );
                 _showBuyOrZatchBottomSheet(context, productToBuy, "buy");
 
@@ -427,7 +427,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   // You might need to add other required fields depending on your model
                   color: "red",
                   size: "M",
-                  likeCount: 5, description: ''
+                  likeCount: 5, description: '', reviews: []
               );
               _showBuyOrZatchBottomSheet(context, productToBuy, "buy");
 

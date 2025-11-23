@@ -33,15 +33,18 @@ class _HomePageState extends State<HomePage> {
   List<Category> _allCategories = [];
   bool isLoading = true;
   String? error;
-
-  // This state is no longer needed here if AccountSettingsScreen manages its own state
-  // bool _showAccountDetails = false;
   Category? _selectedCategory;
+  bool get _isSingleCategoryInitiallySelected => widget.selectedCategories?.length == 1 && widget.selectedCategories!.first.name.toLowerCase() != 'explore all';
+  bool _shouldShowKeyboardOnSearch = false;
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index,{bool fromHeader = false}) {
     setState(() {
       _selectedIndex = index;
-      // The logic for _showAccountDetails is removed as it's better handled within AccountSettingsScreen
+      if (index == 1 && fromHeader) {
+        _shouldShowKeyboardOnSearch = true;
+      } else {
+        _shouldShowKeyboardOnSearch = false;
+      }
     });
   }
   void _openZatchAi() {
@@ -59,25 +62,8 @@ class _HomePageState extends State<HomePage> {
     if (mounted) {
       _apiService.init().then((_) {
         fetchUserProfile();
-        _fetchAllCategories();
+       // _fetchAllCategories();
       });
-    }
-  }
-  Future<void> _fetchAllCategories() async {
-    try {
-      final fetched = await _apiService.getCategories();
-      if (mounted) {
-        setState(() {
-          final exploreAllCategory = Category(
-            id: "0",
-            easyname: 'Explore All', name: 'Explore All', subCategories: [],
-          );
-          _allCategories = [exploreAllCategory, ...fetched];
-          _selectedCategory = _allCategories.first;
-        });
-      }
-    } catch (e) {
-      print("Failed to fetch all categories: $e");
     }
   }
 
@@ -108,7 +94,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildContentForCategory() {
-   if (_selectedCategory == null || _selectedCategory!.name.toLowerCase() == 'explore all') {
+    final categoryName = _selectedCategory?.name.toLowerCase() ?? 'explore all';
+    if (_isSingleCategoryInitiallySelected && _selectedCategory?.id == widget.selectedCategories!.first.id) {
+      return _buildSubCategoryGrid();
+    }
+    if (categoryName == 'explore all') {
       return Column(
         children: [
           const LiveFollowersWidget(),
@@ -120,32 +110,65 @@ class _HomePageState extends State<HomePage> {
         ],
       );
     }
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      alignment: Alignment.center,
-      child: Column(
-        children: [
-          const SizedBox(height: 40),
-          Text(
-            'Content for ${_selectedCategory!.name}',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Implement your category-specific widgets here.',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-          const SizedBox(height: 40),
-        ],
-      ),
+    return _buildSubCategoryGrid();
+  }
+  Widget _buildSubCategoryGrid() {
+    final subCategories = _selectedCategory?.subCategories ?? [];
+
+    if (subCategories.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: Text("No sub-categories available.", style: TextStyle(color: Colors.grey)),
+        ),
+      );
+    }return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        itemCount: subCategories.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3, // Adjust number of columns as needed
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 0.8,
+        ),
+        itemBuilder: (context, index) {
+          final sub = subCategories[index];
+          final imageUrl = sub.image?.url ?? '';
+
+          return InkWell(
+              onTap: () {
+                // TODO: Implement navigation to sub-category product list screen
+                print("Tapped on Sub-category: ${sub.name}");
+              },
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: Colors.grey[200],
+                  backgroundImage: imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
+                  child: imageUrl.isEmpty ? Icon(Icons.image_not_supported, color: Colors.grey[400]) : null,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  sub.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                ),
+              ],
+            ),
+          );
+        },
     );
   }
 
+
   Widget _buildHomeTab() {
     if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFFA3DD00)),
-      );
+      return const Center(child: CircularProgressIndicator(color: Color(0xFFA3DD00)));
     }
 
     if (error != null) {
@@ -155,19 +178,15 @@ class _HomePageState extends State<HomePage> {
           children: [
             Text(error ?? "Something went wrong"),
             const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: fetchUserProfile,
-              child: const Text("Retry"),
-            ),
+            ElevatedButton(onPressed: fetchUserProfile, child: const Text("Retry")),
           ],
         ),
       );
     }
-
     return Column(
       children: [
         const SizedBox(height: 25),
-        HeaderWidget(userProfile, onSearchTap: () => _onItemTapped(1)),
+        HeaderWidget(userProfile, onSearchTap: () => _onItemTapped(1,fromHeader: true)),
         Expanded(
           child: SingleChildScrollView(
             child: Column(
@@ -175,13 +194,14 @@ class _HomePageState extends State<HomePage> {
               children: [
                 const SizedBox(height: 16),
                 CategoryTabsWidget(
-                  selectedCategories:
-    _allCategories,
+                  selectedCategories: widget.selectedCategories,
                   onCategorySelected: (category) {
-                    setState(() {
-                      _selectedCategory = category;
-                    });
-                    debugPrint("Selected Category: ${category.name}");
+                    if (_selectedCategory?.id != category.id) {
+                      setState(() {
+                        _selectedCategory = category;
+                      });
+                      debugPrint("Selected Category: ${category.name}");
+                    }
                   },
                 ),
                 _buildContentForCategory(),
@@ -199,7 +219,7 @@ class _HomePageState extends State<HomePage> {
       _buildHomeTab(),
       isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SearchScreen(key: UniqueKey(), userProfile: userProfile),
+          : SearchScreen(key: UniqueKey(), userProfile: userProfile,autoFocus:_shouldShowKeyboardOnSearch ,),
       SellHomeScreen(),
       AccountSettingsScreen(),
     ];
@@ -234,35 +254,3 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class MessagesScreen extends StatelessWidget {
-  const MessagesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // A simple placeholder for the messages screen
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Messages',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 1,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No Messages Yet',
-              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -8,7 +8,7 @@ import 'package:zatch_app/services/api_service.dart';
 class OtpController {
   final ApiService _apiService = ApiService();
 
-  Future<SendOtpResponse?> sendOtp(String phoneNumber, String countryCode) async {
+  Future<ResponseApi?> sendOtp(String phoneNumber, String countryCode) async {
     try {
       final req = SendOtpRequest(
         countryCode: countryCode,
@@ -25,7 +25,7 @@ class OtpController {
     }
   }
 
-  Future<VerifyOtpResponse?> verifyOtp(String phoneNumber, String countryCode, String otp) async {
+  Future<VerifyApiResponse?> verifyOtp(String phoneNumber, String countryCode, String otp) async {
     try {
       final req = VerifyOtpRequest(
         countryCode: countryCode,
@@ -34,6 +34,7 @@ class OtpController {
       );
       debugPrint(" Verify OTP Request: ${req.toJson()}");
 
+      // This now returns VerifyApiResponse
       final res = await _apiService.verifyOtp(req);
       debugPrint(" Verify OTP Response: ${res.toJson()}");
       return res;

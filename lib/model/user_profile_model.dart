@@ -11,7 +11,7 @@ class UserProfile {
   final String? role;
   final String? profilePicUrl;
   final String? sellerStatus;
-  final int followerCount;
+   int followerCount;
   final int reviewsCount;
   final int productsSoldCount;
   final int customerRating;

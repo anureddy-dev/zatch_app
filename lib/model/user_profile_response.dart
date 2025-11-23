@@ -4,7 +4,6 @@ class UserProfileResponse {
   final bool success;
   final String message;
   final User user;
-
   UserProfileResponse({
     required this.success,
     required this.message,
@@ -33,6 +32,7 @@ class UserProfileResponse {
 
 class User {
   final String id;
+  final bool isFollowing;
   final String username;
   final String countryCode;
   final String phone;
@@ -53,10 +53,11 @@ class User {
   final DateTime createdAt;
   final String sellerStatus;
   final List<dynamic> sellingProducts;
-  final List<dynamic> upcomingLives;
+  final List<UpcomingLive> upcomingLives;
 
   User({
     required this.id,
+    this.isFollowing = false,
     required this.username,
     required this.countryCode,
     required this.phone,
@@ -78,6 +79,7 @@ class User {
     required this.sellerStatus,
     required this.sellingProducts,
     required this.upcomingLives,
+
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -111,6 +113,7 @@ class User {
 
     return User(
       id: json['_id'] ?? '',
+      isFollowing: json['isFollowing'] ?? false,
       username: json['username'] ?? '',
       countryCode: json['countryCode'] ?? '',
       phone: json['phone'] ?? '',
@@ -131,13 +134,14 @@ class User {
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       sellerStatus: json['sellerStatus'] ?? '',
       sellingProducts: List<dynamic>.from(json['sellingProducts'] ?? []),
-      upcomingLives: List<dynamic>.from(json['upcomingLives'] ?? []),
+      upcomingLives: List<UpcomingLive>.from((json['upcomingLives'] ?? []).map((x) => UpcomingLive.fromJson(x))),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       '_id': id,
+      'isFollowing': isFollowing,
       'username': username,
       'countryCode': countryCode,
       'phone': phone,
@@ -158,7 +162,7 @@ class User {
       'createdAt': createdAt.toIso8601String(),
       'sellerStatus': sellerStatus,
       'sellingProducts': sellingProducts,
-      'upcomingLives': upcomingLives,
+      'upcomingLives': List<dynamic>.from(upcomingLives.map((x) => x.toJson())),
     };
   }
 
@@ -294,4 +298,32 @@ class ProductImage {
   Map<String, dynamic> toJson() => {
     "url": url,
   };
+}
+class UpcomingLive {
+  final String id;
+  final String title;
+  final DateTime scheduledStartTime;
+
+  UpcomingLive({
+    required this.id,
+    required this.title,
+    required this.scheduledStartTime,
+  });
+
+  factory UpcomingLive.fromJson(Map<String, dynamic> json) {
+    return UpcomingLive(
+      id: json['_id'] ?? '',
+      title: json['title'] ?? 'Untitled Live',
+      scheduledStartTime:
+      DateTime.tryParse(json['scheduledStartTime'] ?? '') ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      '_id': id,
+      'title': title,
+      'scheduledStartTime': scheduledStartTime.toIso8601String(),
+    };
+  }
 }

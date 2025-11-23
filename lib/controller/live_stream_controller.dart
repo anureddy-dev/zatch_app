@@ -8,8 +8,10 @@ import '../view/profile/profile_screen.dart';
 
 
 class LiveStreamController extends ChangeNotifier {
+  final ApiService _apiService = ApiService();
   final Session? session;
-  LiveStreamController({ this.session});
+  SessionDetails? sessionDetails ;
+  LiveStreamController({ this.session, this.sessionDetails});
 
   bool isLiked = false;
   bool isSaved = false;
@@ -34,45 +36,44 @@ class LiveStreamController extends ChangeNotifier {
   }
 
   Future<void> toggleSave(BuildContext context) async {
-    final bitId = session?.id;
-    if (bitId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error: Could not find item to save.")),
-      );
-      return;
-    }
-
-    final previousState = isSaved;
-    isSaved = !isSaved;
-    notifyListeners();
-
+    if (session == null) return;
     try {
-      final response = await _api.toggleBitSavedStatus(bitId);
-      isSaved = response.savedBitsCount > 0;
-      if (isSaved != previousState) {
-        notifyListeners();
-      }
+      final response = await _apiService.toggleSaveBit(session!.id);
+      isSaved = response.isSaved;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            isSaved ? "Saved to collection" : "Removed from saves",
-          ),
+          content: Text(response.message),
+          backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
-      isSaved = previousState;
-      notifyListeners();
-
-      debugPrint("Failed to update save status: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't save item. Please try again.")),
+        SnackBar(
+          content: Text("Error: ${e.toString()}"),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
+  Future<void> share(BuildContext context) async {
+    if (session == null || session!.id.isEmpty) {
+      Share.share("Check out this live stream on Zatch!");
+      return;
+    }
 
-  void share(BuildContext context) {
-    final liveLink = "https://zatch.live/${session?.host?.id ?? ""}";
-    Share.share("Watch ${session?.host?.username ?? ""}'s live stream here: $liveLink");
+    try {
+      final String shareLink = await _apiService.shareBit(session!.id);
+      final hostUsername = session?.host?.username ?? "a user";
+      Share.share("Watch $hostUsername's live stream on Zatch: $shareLink");
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Could not generate share link. Please try again."),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void addToCart(BuildContext context) {

@@ -17,14 +17,13 @@ class LiveSessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sessionBackgroundUrl = liveSession.host?.profilePicUrl ??
-        'https://placehold.co/600x400/cccccc/999999?text=${Uri.encodeComponent(liveSession.title ?? "Live")}';
-
-    final hostAvatarUrl = liveSession.host?.profilePicUrl ??
-        'https://placehold.co/40x40/777777/ffffff?text=${(liveSession.host?.username.isNotEmpty ?? false) ? liveSession.host!.username[0].toUpperCase() : "U"}';
-
-    final hostName = liveSession.host?.username ?? 'Host';
-    final sessionTopic = liveSession.title ?? "General";
+    // --- Data Handling with Fallbacks ---
+    final String hostName = liveSession.host?.username ?? 'Live Event';
+    final String sessionTopic = liveSession.title ?? "General";
+    final String hostAvatarUrl = liveSession.host?.profilePicUrl ??
+        'https://placehold.co/40x40/777777/ffffff?text=${hostName.isNotEmpty ? hostName[0].toUpperCase() : 'L'}';
+    final String sessionBackgroundUrl = liveSession.host?.profilePicUrl ??
+        'https://placehold.co/131x158/cccccc/999999?text=${Uri.encodeComponent(sessionTopic)}';
 
     return GestureDetector(
       onTap: () {
@@ -32,85 +31,115 @@ class LiveSessionCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => LiveStreamScreen(controller: liveController, username: hostName),
+            builder: (_) => LiveStreamScreen(
+                controller: liveController, username: liveSession.host?.username),
           ),
         );
       },
-      child: Container(
-        width: width,
-        height: height,
+      child: SizedBox(
+        width: width ?? 131,
+        height: height ?? 158,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18.0),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Background Image
+              // --- Background Image ---
               Image.network(
                 sessionBackgroundUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
-                  color: Colors.grey[300],
-                  child: Center(
-                    child: Icon(Icons.image_not_supported_outlined, color: Colors.grey[500]),
-                  ),
+                  color: Colors.grey[200],
+                  child: Icon(Icons.person_off_outlined, color: Colors.grey[400]),
                 ),
               ),
-              // Gradient Overlay
+
+              // --- Gradient Overlay ---
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                    begin: const Alignment(0.5, -0.0),
+                    end: const Alignment(0.5, -0.0),
+                    colors: [
+                      const Color(0x4C000000),
+                      const Color(0x35000000),
+                      const Color(0x00000000),
+                      const Color(0x00000000),
+                      const Color(0x51000000),
+                      const Color(0x99000000),
+                    ],
                   ),
                 ),
               ),
-              // Live Badge
-              if ((liveSession.status).toLowerCase() == 'live')
+
+              // --- "LIVE" Badge ---
+              if (liveSession.status.toLowerCase() == 'live')
                 Positioned(
                   left: 10,
                   top: 10,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    height: 17,
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
                     decoration: BoxDecoration(
                       color: const Color(0xFFBBF711),
                       borderRadius: BorderRadius.circular(48),
                     ),
-                    child: Text(
-                      'Live  ${liveSession.viewersCount ?? 0}',
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Live',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 8,
+                            fontFamily: 'Encode Sans',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${liveSession.viewersCount}',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 8,
+                            fontFamily: 'Encode Sans',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              // Host Info
+
+              // --- Host Info ---
               Positioned(
-                bottom: 8,
-                left: 8,
-                right: 8,
+                bottom: 10,
+                left: 10,
+                right: 10,
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    ClipOval(
-                      child: Image.network(
-                        hostAvatarUrl,
-                        width: 28,
-                        height: 28,
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, st) => Container(
-                          width: 28,
-                          height: 28,
-                          color: Colors.grey[400],
-                          child: const Icon(Icons.person, size: 16, color: Colors.white70),
+                    if (liveSession.host != null)
+                      ClipOval(
+                        child: Image.network(
+                          hostAvatarUrl,
+                          width: 20,
+                          height: 20,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, st) => Container(
+                            width: 20,
+                            height: 20,
+                            color: Colors.grey[400],
+                            child: const Icon(Icons.person, size: 12, color: Colors.white70),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             hostName,
@@ -118,8 +147,9 @@ class LiveSessionCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(
@@ -127,9 +157,10 @@ class LiveSessionCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                              fontSize: 7,
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],

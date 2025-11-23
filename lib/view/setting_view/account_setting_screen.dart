@@ -1,3 +1,4 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
 import 'package:zatch_app/model/carts_model.dart';
 import 'package:zatch_app/model/user_profile_response.dart';
@@ -7,6 +8,7 @@ import 'package:zatch_app/view/category_screen/category_screen.dart';
 import 'package:zatch_app/view/help_screen.dart';
 import 'package:zatch_app/view/order_view/order_screen.dart';
 import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
+import 'package:zatch_app/view/setting_view/preferences_screen.dart';
 import 'package:zatch_app/view/setting_view/profile_screen.dart';
 import 'package:zatch_app/view/zatching_details_screen.dart';
 import 'account_details_screen.dart';
@@ -68,6 +70,54 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     }
   }
 
+  Future<void> _showLogoutConfirmationDialog() async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Are you sure you want to log out?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false), // Dismiss and return false
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true), // Dismiss and return true
+              child: const Text('Log Out', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    // If the user confirmed (confirm is true), then proceed with logout.
+    if (confirm == true) {
+      await _performLogout();
+    }
+  }
+  Future<void> _performLogout() async {
+    // This logic was moved from the onTap callback.
+    setState(() => isLoading = true);
+    final prefs = PreferenceService();
+
+    try {
+      await _apiService.logoutUser();
+      await prefs.logoutAll();
+
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Logout failed: $e")),
+        );
+        // Only stop loading on failure, as success navigates away.
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -93,42 +143,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ),
 
           const SizedBox(height: 16),
-/*
-
-          // ✅ DEBUG RESPONSE SECTION
-          if (rawResponseText != null) ...[
-            const Text(
-              "🔍 API Response:",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black12,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Text(
-                  rawResponseText!,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-*/
-
-          // ✅ SETTINGS CARD SECTION
           _settingsContainer(),
         ],
       ),
@@ -217,16 +231,31 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             },
           ),
           _settingsTile(Icons.dark_mode, "Dark Mode", () {}),
-          _settingsTile(Icons.tune, "Change Preferences in shopping", () {
-            Navigator.pushReplacement(
+          _settingsTile(Icons.tune, "Change Preferences in shopping", () async {
+            final result = await Navigator.push<List<String>>(
               context,
-              MaterialPageRoute(    builder: (_) => CategoryScreen(
-                title: "Your Preferences",
-              ),
-              ),
+              MaterialPageRoute(builder: (context) => const PreferencesScreen()),
             );
+            if (result != null) {
+              print("✅ Navigated back from Preferences with data: $result");
+              if (!mounted) return;
+              Flushbar(
+                title: "Success",
+                message: "Preferences updated with ${result.length} items.",
+                duration: const Duration(seconds: 3),
+                backgroundColor: Colors.green,
+                margin: const EdgeInsets.all(8),
+                borderRadius: BorderRadius.circular(8),
+                icon: const Icon(Icons.check_circle_outline, size: 28.0, color: Colors.white),
+                flushbarPosition: FlushbarPosition.TOP,
+              ).show(context);
 
+            } else {
+              print("--- Navigated back from Preferences without data. ---");
+            }
           }),
+
+
           _settingsTile(Icons.help_outline, "Help", () {
             Navigator.push(
               context,
@@ -253,28 +282,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               ),
             );
           }),
-          _settingsTile(Icons.logout, "Log out", () async {
-            setState(() => isLoading = true);
-            final prefs = PreferenceService();
-
-            try {
-              await _apiService.logoutUser();
-              await prefs.logoutAll();
-
-              if (!mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/login', (route) => false);
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Logout failed: $e")),
-                );
-              }
-            } finally {
-              if (mounted) setState(() => isLoading = false);
-            }
-          }),
-        ],
+          _settingsTile(
+            Icons.logout,
+            "Log out",
+            _showLogoutConfirmationDialog,
+          ),        ],
       ),
     );
   }
@@ -347,7 +359,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     );
   }
 
-  Widget _settingsTile(IconData icon, String title, VoidCallback onTap) {
+  Widget _settingsTile(IconData icon, String title, VoidCallback onTap,{BuildContext? contexts}) {
     return ListTile(
       leading: Icon(icon, color: Colors.black),
       title: Text(title),

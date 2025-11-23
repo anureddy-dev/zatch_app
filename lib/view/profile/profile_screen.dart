@@ -1,3 +1,5 @@
+// lib/view/profile/profile_screen.dart
+
 import 'package:another_flushbar/flushbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -6,13 +8,14 @@ import 'package:share_plus/share_plus.dart';
 import 'package:zatch_app/controller/live_stream_controller.dart';
 import 'package:zatch_app/model/carts_model.dart';
 import 'package:zatch_app/model/live_session_res.dart';
-import 'package:zatch_app/model/user_profile_model.dart';
 import 'package:zatch_app/services/api_service.dart';
 import 'package:zatch_app/view/LiveDetailsScreen.dart';
 import 'package:zatch_app/view/ReelDetailsScreen.dart';
 import 'package:zatch_app/view/product_view/product_detail_screen.dart';
 import 'package:zatch_app/view/profile_image_viewer.dart';
 import 'package:zatch_app/view/zatching_details_screen.dart';
+
+import '../../model/user_profile_response.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -27,11 +30,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   late TabController _tabController;
   final List<String> _tabs = ["Buy Bits", "Shop", "Upcoming Live"];
 
-  UserProfile? _userProfile;
+  User? _userProfile;
   bool _isLoading = true;
   bool _isFollowing = false;
   bool _isSharing = false;
   bool _isFollowLoading = false;
+  int _followerCount = 0;
 
   @override
   void initState() {
@@ -73,36 +77,59 @@ class _ProfileScreenState extends State<ProfileScreen>
       final profile = await ApiService().getUserProfileById(widget.userId!);
 
       debugPrint("Success! Profile data received: ${profile.toString()}");
-      setState(() {
-        _userProfile = profile;
-        _isFollowing = profile.followers.isNotEmpty;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _userProfile = profile.user;
+          _isFollowing = profile.user.isFollowing ?? false;
+          _followerCount = profile.user.followerCount; // Initialize follower count here
+          _isLoading = false;
+        });
+      }
     } catch (e, stackTrace) {
       debugPrint("Error fetching profile: $e");
       debugPrint(stackTrace.toString());
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _onFollowPressed() async {
-    if (widget.userId == null) return;
-    setState(() => _isFollowLoading = true);
+    if (widget.userId == null || _isFollowLoading) return;
+
+    // 1. Keep the optimistic UI for the loading spinner
+    setState(() {
+      _isFollowLoading = true;
+    });
+
+    final originalFollowState = _isFollowing; // Store original state for error rollback
 
     try {
-      final res = await ApiService().toggleFollowUser(widget.userId!);
-      await _fetchUserProfile();
-      setState(() {
-        _isFollowing = !_isFollowing;
-        _isFollowLoading = false;
-      });
-
-      final message = _isFollowing
-          ? "You are now following ${_userProfile?.username ?? 'this user'}"
-          : "You unfollowed ${_userProfile?.username ?? 'this user'}";
-    //  _showMessage(_isFollowing ? "Followed" : "Unfollowed", message);
-    } catch (e) {
-      setState(() => _isFollowLoading = false);
+      // 2. Call the API and wait for the response
+      final response = await ApiService().toggleFollowUser(widget.userId!);
+ if (mounted) {
+          setState(() {
+            _isFollowing = response.isFollowing;
+            _followerCount = response.followerCount;
+          });
+          // Show the message from the server response
+          _showMessage(
+            _isFollowing ? "Followed" : "Unfollowed",
+            response.message,
+          );
+        }
+      } catch (e) {
+      debugPrint("Error toggling follow: $e");
+      // 4. If the API call fails, revert to the original state
+      if (mounted) {
+        setState(() {
+          _isFollowing = originalFollowState;
+        });
+        _showMessage("Error", "Action failed. Please try again.", isError: true);
+      }
+    } finally {
+      // 5. Always stop the loading indicator
+      if (mounted) {
+        setState(() => _isFollowLoading = false);
+      }
     }
   }
   Future<void> _onSharePressed() async {
@@ -185,12 +212,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildProfileHeader(UserProfile user) {
+  Widget _buildProfileHeader(User user) {
     const heroTag = "profile-picture-hero";
     // Determine if the URL is valid. Use a placeholder if not.
-    final hasImage = user.profilePicUrl != null && user.profilePicUrl!.isNotEmpty;
+    final hasImage = user.profilePic.url.isNotEmpty;
     final imageUrl = hasImage
-        ? user.profilePicUrl!
+        ? user.profilePic.url
         : "https://via.placeholder.com/150/FFFFFF/000000?Text=No+Image"; // A default placeholder
 
     return Positioned(
@@ -202,6 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           GestureDetector(
             // MODIFIED: This onTap will now always trigger
             onTap: () {
+              if (!hasImage) return; // Prevent opening placeholder image
               Navigator.of(context).push(
                 PageRouteBuilder(
                   opaque: false,
@@ -230,7 +258,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 child: CircleAvatar(
                   radius: 50,
                   // MODIFIED: Use the determined 'hasImage' boolean
-                  backgroundImage: hasImage ? NetworkImage(user.profilePicUrl!) : null,
+                  backgroundImage: hasImage ? NetworkImage(user.profilePic.url) : null,
                   // REMOVED: onBackgroundImageError to prevent the crash
                   // Show a placeholder icon only if there's no image
                   child: !hasImage
@@ -245,7 +273,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-               "${ user.username}", // Using user.username directly as it's non-nullable in the model
+                user.username, // Using user.username directly as it's non-nullable in the model
                 style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -254,12 +282,12 @@ class _ProfileScreenState extends State<ProfileScreen>
               const SizedBox(width: 6),/*
               // Conditionally show verified icon based on user data
               if (user.isVerified)*/
-                const Icon(Icons.verified,
-                    size: 18, color: Color(0xFFCCF656)),
+              const Icon(Icons.verified,
+                  size: 18, color: Color(0xFFCCF656)),
             ],
           ),
           Text(
-            "${user.followerCount} Followers",
+            "${_followerCount} Followers",
             style: const TextStyle(color: Colors.black54, fontSize: 14),
           ),
         ],
@@ -267,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildStats(UserProfile user) {
+  Widget _buildStats(User user) {
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Row(
@@ -319,11 +347,17 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
           ElevatedButton(
+            // ✅ UPDATED STYLE LOGIC
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-              _isFollowing ? Color(0xFFCCF656) : const Color(0xFFCCF656),
+              // Change color based on the state
+              backgroundColor: _isFollowing ? Colors.white : const Color(0xFFCCF656),
+              foregroundColor: Colors.black, // Set text/icon color for both states
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30)),
+              // Add a border only when "Following"
+              side: _isFollowing
+                  ? const BorderSide(color: Color(0xFFCCF656), width: 1.5)
+                  : BorderSide.none,
               padding:
               const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
               elevation: 2,
@@ -333,7 +367,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ? const SizedBox(
               width: 18,
               height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
             )
                 : Text(
               _isFollowing ? "Following" : "Follow",
@@ -368,8 +402,13 @@ class _ProfileScreenState extends State<ProfileScreen>
         borderRadius: BorderRadius.circular(30),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(5.0),
+        padding: const EdgeInsets.symmetric(vertical: 5.0),
         child: TabBar(
+          isScrollable: true,
+          tabAlignment: TabAlignment.center,
+          padding: EdgeInsets.zero,
+          indicatorPadding: EdgeInsets.zero,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 25.0),
           dividerColor: Colors.transparent,
           controller: _tabController,
           indicatorSize: TabBarIndicatorSize.tab,
@@ -399,7 +438,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
 
   /// TAB 1: Buy Bits (Saved Bits)
-  Widget _buildBitsView(UserProfile user) {
+  Widget _buildBitsView(User user) {
     final bits = user.savedBits;
 
     if (bits.isEmpty) {
@@ -448,7 +487,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [Colors.transparent, Colors.black87],
-                            stops: [0.6, 1.0],
+                            stops: const [0.6, 1.0],
                           ),
                         ),
                       ),
@@ -464,7 +503,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
   /// TAB 2: Shop (Selling Products)
-  Widget _buildShopView(UserProfile user) {
+  Widget _buildShopView(User user) {
     // This list correctly contains SavedProduct objects.
     final products = user.savedProducts;
 
@@ -495,7 +534,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   /// TAB 3: Upcoming Live
-  Widget _buildLiveView(UserProfile user) {
+  Widget _buildLiveView(User user) {
     final liveEvents = user.upcomingLives;if (liveEvents.isEmpty) {
       return const Center(
         child: Text("No live events scheduled yet!", style: TextStyle(color: Colors.grey)),
@@ -554,7 +593,7 @@ class _LiveEventCardState extends State<_LiveEventCard> {
   @override
   void initState() {
     super.initState();
-   isLiked = false;
+    isLiked = false;
   }
 
   Future<void> _toggleLike() async {
@@ -778,7 +817,7 @@ class _ProductCardState extends State<_ProductCard> {
   Widget build(BuildContext context) {
     // Extract data directly from the SavedProduct object.
     final product = widget.product;
-    final imageUrl = product.imageUrl ?? '';
+    final imageUrl = product.images.isNotEmpty ? product.images.first.url : '';
     final title = product.name;
     final price = '₹ ${product.price.toStringAsFixed(2)}';
 

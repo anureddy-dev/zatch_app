@@ -1,24 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:zatch_app/controller/live_stream_controller.dart';
 import 'package:zatch_app/model/carts_model.dart';
+import 'package:zatch_app/model/live_comment.dart';
 import 'package:zatch_app/model/product_response.dart';
 import 'package:zatch_app/services/api_service.dart';
-import 'package:zatch_app/view/cart_screen.dart';
 import 'package:zatch_app/view/product_view/product_detail_screen.dart';
 import 'package:zatch_app/view/profile/profile_screen.dart';
 import 'package:zatch_app/view/setting_view/payments_shipping_screen.dart';
 import 'package:zatch_app/view/zatching_details_screen.dart';
+import 'cart_screen.dart';
 
 class LiveStreamScreen extends StatefulWidget {
   final LiveStreamController controller;
   final String? username;
 
-  const LiveStreamScreen({
-    super.key,
-    required this.controller,
-    this.username,
-  });
+  const LiveStreamScreen({super.key, required this.controller, this.username});
 
   @override
   State<LiveStreamScreen> createState() => _LiveStreamScreenState();
@@ -28,73 +24,158 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
   bool showComments = false;
   bool _isLoading = true;
   final TextEditingController _commentController = TextEditingController();
-  int likeCount = 4200;
-  int commentCount = 300;
+  bool isLiked = false;
+  int likeCount = 0;
+  Map<String, dynamic>? _sessionDetails;
+  List<LiveComment> _comments = [];
+  late PageController _pageController;
+  int _currentPage = 0; // To track the currently featured product
 
-  final List<Map<String, String>> demoMessages = [
-    {"user": "SpeedySofa", "message": "First comment! Let's go! 🔥"},
-    {"user": "EagleEye", "message": "What's the price on this one?"},
-    {"user": "LunaLove", "message": "OMG I love this color! 😍"},
-    {"user": "Gamer_God", "message": "OP gameplay as always!"},
-    {"user": "RandomBot_77", "message": "Check out my profile for more! "},
-    {"user": "Nikhil", "message": "Does it come in blue?"},
-    {"user": "Anu", "message": "haha, this looks very funny 😄"},
-    {"user": "QuietObserver", "message": "Just watching... looks cool."},
-    {"user": "Priya_S", "message": "Can you show the back of the product please?"},
-    {"user": "scOut Ka jabra fan", "message": "Shout out pls sir big fan 🙏"},
-    {"user": "BargainHunter", "message": "Any discount available today?"},
-    {"user": "Nikki", "message": "I love this ❤️"},
-    {"user": "Yt gamer", "message": "This is op"},
-  ];
+  String _formatNumber(int number) {
+    if (number < 1000) {
+      return number.toString();
+    } else {
+      double num = number / 1000.0;
+      return '${num.toStringAsFixed(1)}k';
+    }
+  }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _commentController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(
+      viewportFraction: 0.85, // Shows a bit of the next/prev items
+      initialPage: _currentPage,
+    );
+
+    _pageController.addListener(() {
+      final newPage = _pageController.page?.round();
+      if (newPage != null && newPage != _currentPage) {
+        setState(() {
+          _currentPage = newPage;
+        });
+      }
+    });
+
     _initializeStream();
   }
 
   Future<void> _initializeStream() async {
-    await widget.controller.fetchProducts();
-    await _joinLiveSession();
-    if (mounted) setState(() => _isLoading = false);
-  }
-
-  Future<void> _joinLiveSession() async {
-    final username = widget.username;
-
-    if (username == null || username.isEmpty) return;
+    if (!mounted) return;
+    setState(() => _isLoading = true);
 
     try {
-      final response = await ApiService().joinLiveSession(username);
-      debugPrint("Joined Live Session: $response");
+      final sessionId = widget.controller.session?.id;
+      if (sessionId == null || sessionId.isEmpty) {
+        throw Exception("Session ID is missing. Cannot load stream.");
+      }
+      final results = await Future.wait([
+        ApiService().getLiveSessionDetails(sessionId),
+        ApiService().getLiveSessionComments(sessionId, limit: 20),
+        ApiService().joinLiveSession(sessionId),
+      ]);
+      final details = results[0] as Map<String, dynamic>;
+      final comments = results[1] as List<LiveComment>;
+
+      if (mounted) {
+        setState(() {
+          _sessionDetails = details;
+          _comments = comments;
+          _isLoading = false;
+          likeCount = details['likeCount'] as int? ?? 0;
+          isLiked = details['isLiked'] as bool? ?? false;
+        });
+      }
     } catch (e) {
-      debugPrint("Failed to join live session: $e");
+      debugPrint("Failed to initialize stream: $e");
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Could not load stream. It may have ended."),
+            backgroundColor: Colors.red,
+          ),
+        );
+        /* Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        });*/
+      }
     }
   }
-  void _toggleLike() {
-    setState(() {
-      if (widget.controller.isLiked) {
-        likeCount--;
-      } else {
-        likeCount++;
+
+  Future<void> _postComment() async {
+    final text = _commentController.text.trim();
+    final sessionId = widget.controller.session?.id;
+    if (text.isEmpty || sessionId == null) return;
+
+    final originalText = _commentController.text;
+    _commentController.clear();
+    FocusScope.of(context).unfocus();
+
+    try {
+      final newComment = await ApiService().postLiveComment(sessionId, text);
+      if (mounted) {
+        setState(() {
+          _comments.insert(0, newComment);
+        });
       }
-      widget.controller.toggleLike(context);
+    } catch (e) {
+      if (mounted) {
+        _commentController.text = originalText;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't post comment. Please try again."),
+          ),
+        );
+      }
+      debugPrint("Failed to post comment: $e");
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    final sessionId = widget.controller.sessionDetails?.id;
+    if (sessionId == null) return;
+
+    setState(() {
+      isLiked = !isLiked;
+      likeCount += isLiked ? 1 : -1;
     });
+
+    try {
+      final response = await ApiService().toggleLike(sessionId);
+      if (mounted) {
+        setState(() {
+          likeCount = response['likeCount'];
+          isLiked = response['isLiked'];
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLiked = !isLiked;
+          likeCount += isLiked ? 1 : -1;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't update like status. Please try again."),
+          ),
+        );
+      }
+      debugPrint("Failed to toggle like: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
-    final session = controller.session;
-    final product = controller.displayedProduct;
-    final hostName = session?.host?.username ?? "Host";
-    final rating = session?.host?.rating ?? "2";
-    final hostProfilePic = session?.host?.profilePicUrl ?? "https://placehold.co/100x100?text=H";
-    final productImage = product?.images.isNotEmpty == true
-        ? product!.images.first.url
-        : "https://placehold.co/100x100/222/FFF?text=Product";
-
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -104,456 +185,513 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
       );
     }
 
+    final session = widget.controller.session;
+    final hostName = session?.host?.username ?? "Host";
+    final rating = session?.host?.rating ?? "0";
+    final viewersCount = _sessionDetails?['viewersCount'] as int? ?? 0;
+    final hostProfilePic =
+        _sessionDetails?['host']?['profilePicUrl'] ??
+        session?.host?.profilePicUrl ??
+        "https://placehold.co/100x100?text=H";
+    final backgroundUrl =
+        _sessionDetails?['thumbnail'] ??
+        session?.host?.profilePicUrl ??
+        "https://placehold.co/428x926/333/FFF?text=Live";
+    final likeIcon = isLiked ? Icons.favorite : Icons.favorite_border;
+
     return WillPopScope(
-      onWillPop: ()async{
+      onWillPop: () async {
         if (showComments) {
-          setState(() {
-            showComments = false;
-          });
+          setState(() => showComments = false);
           return false;
         }
         return true;
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // Background
-            Positioned.fill(
-              child: Image.network(
-                session?.host?.profilePicUrl ??
-                    "https://placehold.co/428x926/333/FFF?text=Live+Stream",
-                fit: BoxFit.cover,
-              ),
+            _buildBackgroundAndHostInfo(
+              backgroundUrl,
+              hostProfilePic,
+              hostName,
+              rating,
+              viewersCount,
+              session?.host?.id,
             ),
-            Positioned.fill(
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.transparent, Colors.black54],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-              ),
-            ),
+            _buildSidebar(likeIcon, likeCount, _comments.length),
+            if (widget.controller.products.isNotEmpty) _buildProductAndChatUI(),
+            if (showComments) _buildFullChatUI(),
+          ],
+        ),
+      ),
+    );
+  }
 
-            // Host info
-            Positioned(
-              top: 45,
-              left: 20,
-              right: 20,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(onTap: (){
+  // Helper to group background and host info widgets
+  Widget _buildBackgroundAndHostInfo(
+    String backgroundUrl,
+    String hostProfilePic,
+    String hostName,
+    String rating,
+    int viewersCount,
+    String? hostId,
+  ) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Image.network(
+            backgroundUrl,
+            fit: BoxFit.cover,
+            errorBuilder:
+                (context, error, stackTrace) => Container(color: Colors.black),
+          ),
+        ),
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.transparent, Colors.black54],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 45,
+          left: 20,
+          right: 20,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (hostId != null) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ProfileScreen(userId: session?.host?.id ?? ""),
+                        builder: (_) => ProfileScreen(userId: hostId),
                       ),
                     );
-                  },
-                    child: Row(
-                      children: [
-                        CircleAvatar(radius: 24, backgroundImage: NetworkImage(hostProfilePic)),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              hostName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                             Text(
-                             "⭐ $rating  ⭐ ${session?.viewersCount} " ?? "⭐ 5.0  •  32k",
-                              style: TextStyle(color: Colors.white70, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ],
+                  }
+                },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundImage: NetworkImage(hostProfilePic),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child:  Row(
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.visibility, color: Colors.white, size: 16),
-                        SizedBox(width: 5),
                         Text(
-                          "${session?.viewersCount} Live" ?? "4.2k  Live",
-                          style: TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          hostName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          "⭐ $rating  •  ${_formatNumber(viewersCount)}",
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Right-side icons
-            Positioned(
-              right: 15,
-              bottom: 250,
-              child: Column(
-                children: [
-                  _SidebarItem(icon: Icons.share_outlined, onTap: () {
-                    controller.share(context);
-                  }),
-                  const SizedBox(height: 20),
-                  _SidebarItem(
-                    icon: controller.isLiked ? Icons.favorite : Icons.favorite_border,
-                    label: likeCount.toString(),
-                    onTap: _toggleLike,
-                  ),
-                  const SizedBox(height: 20),
-                  _SidebarItem(
-                    icon: Icons.chat_bubble_outline,
-                    label: commentCount.toString(),
-                    onTap: () => setState(() => showComments = !showComments),
-                  ),
-                  const SizedBox(height: 20),
-                  _SidebarItem(
-                    icon: controller.isSaved ? Icons.bookmark : Icons.bookmark_border,
-                    onTap: () {
-                      controller.toggleSave(context);
-                      setState(() {});
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _SidebarItem(
-                    icon: Icons.shopping_cart_outlined,
-                    onTap: () => controller.addToCart(context),
-                  ),
-                ],
-              ),
-            ),
-
-            // Product & Comments
-            if (!showComments) ...[
-              Positioned(
-                left: 20,
-                right: 80,
-                bottom: 250,
-                height: 120,
-                child: GestureDetector(
-                  onTap: () => setState(() => showComments = true),
-                  child: AbsorbPointer(
-                    absorbing: false,
-                    child: ListView.builder(
-                      reverse: true,
-                      itemCount: demoMessages.length,
-                      itemBuilder: (context, index) {
-                        final message = demoMessages.reversed.toList()[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 6.0),
-
-                          child: _ChatBubble(
-                            user: message["user"] ?? "User",
-                            message: message["message"] ?? "",
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  ],
                 ),
               ),
-
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 200,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("Product",
-                        style: TextStyle(color: Colors.white, fontSize: 13)),
-                    GestureDetector(
-                      onTap: () => _showCatalogueBottomSheet(context),
-                      child: const Text(
-                        "View all",
-                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                    const Icon(Icons.visibility, color: Colors.white, size: 16),
+                    const SizedBox(width: 5),
+                    Text(
+                      "${_formatNumber(viewersCount)} Live",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
                       ),
                     ),
                   ],
                 ),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 110,
-                height: 80,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: controller.products.length,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemBuilder: (context, index) {
-                    final product = controller.products[index];
-                    final productImage = product.images.isNotEmpty
-                        ? product.images.first.url
-                        : "https://placehold.co/100x100/222/FFF?text=P";
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 12.0),
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ProductDetailScreen(productId: product.id),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: 350,
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(16),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Helper for the sidebar icons
+  Widget _buildSidebar(IconData likeIcon, int likeCount, int commentCount) {
+    return Positioned(
+      right: 15,
+      bottom: 250,
+      child: Column(
+        children: [
+          _SidebarItem(
+            icon: Icons.share_outlined,
+            onTap: () => widget.controller.share(context),
+          ),
+          const SizedBox(height: 20),
+          _SidebarItem(
+            icon: likeIcon,
+            label: _formatNumber(likeCount),
+            onTap: _toggleLike,
+          ),
+          const SizedBox(height: 20),
+          _SidebarItem(
+            icon: Icons.chat_bubble_outline,
+            label: _formatNumber(commentCount),
+            onTap: () => setState(() => showComments = !showComments),
+          ),
+          const SizedBox(height: 20),
+          _SidebarItem(
+            icon: Icons.add_shopping_cart_rounded,
+            onTap: () => widget.controller.addToCart(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductAndChatUI() {
+    final controller = widget.controller;
+    // Get the currently featured product based on the PageView's active page
+    final featuredProduct = controller.products[_currentPage];
+
+    return Stack(
+      children: [
+        // ... The chat bubble ListView remains the same
+        Positioned(
+          left: 20,
+          right: 80,
+          bottom: 250,
+          height: 120,
+          child: IgnorePointer(
+            child: ListView.builder(
+              reverse: true,
+              itemCount: _comments.length,
+              itemBuilder: (context, index) {
+                final comment = _comments[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: _ChatBubble(
+                    user: comment.user.username,
+                    message: comment.text,
+                    avatarUrl: comment.user.profilePicUrl,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: 200,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Product",
+                style: TextStyle(color: Colors.white, fontSize: 13),
+              ),
+              GestureDetector(
+                onTap: () => _showCatalogueBottomSheet(context),
+                child: const Text(
+                  "View all",
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // --- REPLACED ListView with PageView ---
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 110,
+          height: 80,
+          child: PageView.builder(
+            // Use PageView for better control
+            controller: _pageController,
+            itemCount: controller.products.length,
+            itemBuilder: (context, index) {
+              final product = controller.products[index];
+              final productImage =
+                  product.images.isNotEmpty
+                      ? product.images.first.url
+                      : "https://placehold.co/100x100/222/FFF?text=P";
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                ), // Adjust padding
+                child: GestureDetector(
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => ProductDetailScreen(productId: product.id),
+                        ),
+                      ),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            productImage,
+                            width: 54,
+                            height: 54,
+                            fit: BoxFit.cover,
                           ),
-                          child: Row(
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(productImage,
-                                    width: 54, height: 54, fit: BoxFit.cover),
+                              Text(
+                                product.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      product.name,
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      product.category?.name ?? "Category",
-                                      style: const TextStyle(
-                                          color: Colors.white70, fontSize: 11),
-                                    ),
-                                  ],
+                              Text(
+                                product.category?.name ?? "Category",
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
                                 ),
                               ),
-                              Text("${product.price} ₹",
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 14)),
                             ],
                           ),
                         ),
+                        Text(
+                          "${product.price} ₹",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        // --- CORRECTED BUTTONS ---
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: 25,
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  // Use the 'featuredProduct' for the action
+                  onPressed:
+                      () => _showBuyOrZatchBottomSheet(
+                        context,
+                        featuredProduct,
+                        "zatch",
                       ),
-                    );
-                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFCCF656)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    "Zatch",
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
                 ),
               ),
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 25,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _showCatalogueBottomSheet(context),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFCCF656)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text("Zatch",
-                            style: TextStyle(color: Colors.white, fontSize: 16)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  // Use the 'featuredProduct' for the action
+                  onPressed:
+                      () => _showBuyOrZatchBottomSheet(
+                        context,
+                        featuredProduct,
+                        "buy",
                       ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFCCF656),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _showCatalogueBottomSheet(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFCCF656),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape:
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text("Buy",
-                            style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold)),
-                      ),
+                  ),
+                  child: const Text(
+                    "Buy",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ]
-            else ...[
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 35,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  height: MediaQuery.of(context).size.height * 0.45, // Half screen height
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- (FIX) Corrected Full Chat UI Layout ---
+  Widget _buildFullChatUI() {
+    // This widget now fills the screen and handles its own background dismissal.
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap:
+            () =>
+                setState(() => showComments = false), // Tap background to close
+        child: Container(
+          color: Colors.black.withOpacity(0.3),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              GestureDetector(
+                onTap:
+                    () {}, // Prevents taps inside the chat area from closing it
+                child: Container(
+                  height: MediaQuery.of(context).size.height * 0.5,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
                       colors: [
                         Colors.black.withOpacity(0.85),
-                        Colors.black.withOpacity(0.4),
+                        Colors.black.withOpacity(0.6),
                         Colors.transparent,
                       ],
                     ),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(30),
+                    ),
                   ),
                   child: Column(
                     children: [
-                      // 🔹 Chat Messages
                       Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          child: ListView.builder(
-                            itemCount: demoMessages.length,
-                            reverse: false,
-                            itemBuilder: (context, index) {
-                              final msg = demoMessages[index];
-                              final isSuperchat = msg["type"] == "superchat";
-
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Avatar Circle
-                                    CircleAvatar(
-                                      radius: 18,
-                                      backgroundColor: Colors.white24,
-                                      backgroundImage: msg["avatar"] != null
-                                          ? AssetImage(msg["avatar"]!)
-                                          : null,
-                                      child: msg["avatar"] == null
-                                          ? Text(
-                                        (msg["user"] ?? "?")[0].toUpperCase(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 10),
-
-                                    // Name + Message
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            msg["user"] ?? "",
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            msg["message"] ?? "",
-                                            style: TextStyle(
-                                              color: isSuperchat
-                                                  ? const Color(0xFFFFD700)
-                                                  : Colors.white70,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 20,
                           ),
+                          itemCount: _comments.length,
+                          reverse: true,
+                          itemBuilder: (context, index) {
+                            final comment = _comments[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _ChatBubble(
+                                user: comment.user.username,
+                                message: comment.text,
+                                avatarUrl: comment.user.profilePicUrl,
+                              ),
+                            );
+                          },
                         ),
                       ),
-
-                      // 🔹 Comment Bar
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+                        padding: EdgeInsets.fromLTRB(
+                          12,
+                          4,
+                          12,
+                          MediaQuery.of(context).viewInsets.bottom + 10,
+                        ),
                         child: Row(
                           children: [
-                            // 🔹 Back Button (white rounded)
                             Container(
                               width: 50,
                               height: 50,
-
                               decoration: const BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                               ),
                               child: IconButton(
-                                onPressed: () => setState(() => showComments = false),
-                                icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+                                onPressed:
+                                    () => setState(() => showComments = false),
+                                icon: const Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: Colors.black,
+                                  size: 20,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
-
-                            // 🔹 Comment Bar
                             Expanded(
                               child: Container(
                                 height: 50,
                                 decoration: BoxDecoration(
                                   color: Colors.black.withOpacity(0.5),
                                   borderRadius: BorderRadius.circular(30),
-                                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.2),
+                                  ),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
                                 child: Row(
                                   children: [
-                                    // Comment Input
                                     Expanded(
                                       child: TextField(
                                         controller: _commentController,
-                                        style: const TextStyle(color: Colors.white),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
                                         decoration: const InputDecoration(
                                           hintText: "Comment",
-                                          hintStyle: TextStyle(color: Colors.white54),
+                                          hintStyle: TextStyle(
+                                            color: Colors.white54,
+                                          ),
                                           border: InputBorder.none,
                                           isDense: true,
                                         ),
                                       ),
                                     ),
-
-                                    // Send Button (Neon Green)
                                     GestureDetector(
-                                      onTap: () {
-                                        if (_commentController.text.trim().isEmpty) return;
-                                        setState(() {
-                                          demoMessages.add({
-                                            "user": widget.username ?? "You",
-                                            "message": _commentController.text.trim(),
-                                          });
-                                          _commentController.clear();
-                                        });
-                                      },
+                                      onTap: _postComment,
                                       child: Container(
                                         width: 40,
                                         height: 40,
                                         decoration: const BoxDecoration(
-                                          color: Color(0xFFCCFF55), // Neon green
+                                          color: Color(0xFFCCFF55),
                                           shape: BoxShape.circle,
                                         ),
                                         child: const Icon(
@@ -570,20 +708,16 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
                           ],
                         ),
                       ),
-
                     ],
                   ),
                 ),
               ),
-            ]
-
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
-
-  /// ✅ Bottom Sheet (View All Products)
 
   Color _getColorFromString(String colorString) {
     switch (colorString.toUpperCase()) {
@@ -623,299 +757,55 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
           maxChildSize: 0.95,
           minChildSize: 0.6,
           builder: (context, scrollController) {
-            // FIX 2: Removed horizontal padding from the root Padding widget.
-            // This allows the ListView to be full-width, and we can control
-            // the padding of each card individually.
             return Column(
               children: [
                 const SizedBox(height: 16),
-                // Top bar
                 Padding(
-                  // Add padding here to align the top bar content.
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Row(
                     children: [
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
-                        child: const Icon(Icons.arrow_back_ios, color: Colors.black),
+                        child: const Icon(
+                          Icons.arrow_back_ios,
+                          color: Colors.black,
+                        ),
                       ),
-                       const Expanded(
+                      const Expanded(
                         child: Center(
                           child: Text(
                             "Catalogue",
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 24), // Balances the space of the back arrow Icon.
+                      const SizedBox(width: 24),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
                 Divider(color: Colors.grey.shade300, height: 1),
                 const SizedBox(height: 16),
-                // Product list
+                // --- (FIX) Added Expanded to enable scrolling ---
                 Expanded(
                   child: ListView.builder(
                     controller: scrollController,
                     itemCount: products.length,
                     itemBuilder: (context, index) {
                       final product = products[index];
-                      String? selectedSize = product.size;
-                      Color? selectedColor = _getColorFromString(product.color.toString());
-                      final availableSizes = ["S", "M", "L", "XL"];
-                      final availableColors = [
-                        _getColorFromString("BLUE"),
-                        _getColorFromString("BLACK"),
-                        _getColorFromString("BEIGE"),
-                        _getColorFromString("RED"),
-                        _getColorFromString("WHITE"),
-                        _getColorFromString("DUSKY PURPLE"),
-                        _getColorFromString("GREEN"),
-                      ];
-
-                      return StatefulBuilder(
-                        builder: (context, setState) {
-                          final bool areOptionsSelected = selectedSize != null && selectedColor != null;
-                          return GestureDetector(onTap: (){
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ProductDetailScreen( productId: product.id),
-                              ),
-                            );
-                          },
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.grey.withOpacity(0.2),
-                                    spreadRadius: 1,
-                                    blurRadius: 3,
-                                  )
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Product info row
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: Image.network(
-                                          product.images.isNotEmpty
-                                              ? product.images.first.url
-                                              : "https://placehold.co/95x118",
-                                          width: 56,
-                                          height: 56,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                          children: [
-                                            const SizedBox(height: 4.5),
-                                            Text(
-                                              product.name,
-                                              style: const TextStyle(
-                                                color: Color(0xFF121111),
-                                                fontSize: 14,
-                                                fontFamily: 'Encode Sans',
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Row(
-                                              children: [
-                                                Text(
-                                                  product.category?.name  ??'Dress modern',
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF787676),
-                                                    fontSize: 10,
-                                                    fontFamily: 'Encode Sans',
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  product.likeCount != null
-                                                      ? "${product.likeCount} ⭐"
-                                                      : "⭐ 5.0",
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF121111),
-                                                    fontSize: 10,
-                                                    fontFamily: 'Encode Sans',
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 14.0),
-                                        child: Text(
-                                          "${product.price.toStringAsFixed(2)} ₹",
-                                          style: const TextStyle(
-                                            color: Colors.black,
-                                            fontSize: 16,
-                                            fontFamily: 'Encode Sans',
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 28),
-
-                                  // Size and Color options
-                                  Row(
-                                    children: [
-                                      // Size options
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text( 'Choose Size', style: TextStyle( color: Color(0xFF121111), fontSize: 12, fontFamily: 'Encode Sans', fontWeight: FontWeight.w700, ), ),
-                                            const SizedBox(height: 8),
-                                            Row(
-                                              children: availableSizes.map((s) {
-                                                final isSelected = selectedSize?.toLowerCase() == s.toLowerCase();
-                                                return Padding(
-                                                  padding: const EdgeInsets.only(right: 8),
-                                                  child: GestureDetector(
-                                                    onTap: () => setState(() => selectedSize = s),
-                                                    child: Container(
-                                                      width: 26, height: 26, alignment: Alignment.center,
-                                                      decoration: BoxDecoration(
-                                                        color: isSelected ? const Color(0xFF292526) : Colors.transparent,
-                                                        shape: BoxShape.circle,
-                                                        border: Border.all( color: const Color(0xFFDFDEDE), width: 1, ),
-                                                      ),
-                                                      child: Text( s, style: TextStyle( color: isSelected ? const Color(0xFFFDFDFD) : const Color(0xFF292526), fontSize: 12, fontFamily: 'Encode Sans', fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400, ),),
-                                                    ),
-                                                  ),
-                                                );
-                                              }).toList(),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      // Color options
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text( 'Color', style: TextStyle( color: Color(0xFF121111), fontSize: 12, fontFamily: 'Encode Sans', fontWeight: FontWeight.w700, ), ),
-                                            const SizedBox(height: 8),
-                                            SingleChildScrollView(
-                                              scrollDirection: Axis.horizontal,
-                                              child: Row(
-                                                children: availableColors.map((c) {
-                                                  final isSelected = selectedColor == c;
-                                                  // FIX 1: Wrap the color circle in a padded container.
-                                                  // This gives the border space to draw without being clipped.
-                                                  return GestureDetector(
-                                                    onTap: () => setState(() => selectedColor = c),
-                                                    child: Container(
-                                                      margin: const EdgeInsets.only(right: 8),
-                                                      // This container draws the border and has padding.
-                                                      padding: const EdgeInsets.all(2),
-                                                      decoration: BoxDecoration(
-                                                        shape: BoxShape.circle,
-                                                        border: isSelected ? Border.all( color: const Color(0xFFAFE80C), width: 2, ) : null,
-                                                      ),
-                                                      // This inner container is the colored circle.
-                                                      child: Container(
-                                                        width: 22,
-                                                        height: 22,
-                                                        decoration: BoxDecoration(
-                                                          color: c,
-                                                          shape: BoxShape.circle,
-                                                          // Add a thin border for white color to be visible on white background
-                                                          border: c == Colors.white ? Border.all(color: Colors.grey.shade300) : null,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  );
-                                                }).toList(),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 24),
-
-                                  // Buy + Zatch buttons
-                                  Row(
-                                    children: [
-                                      GestureDetector(
-                                        onTap: () {},
-                                        child: Container(
-                                          width: 50,
-                                          height: 50,
-                                          decoration: const ShapeDecoration(
-                                            shape: OvalBorder( side: BorderSide( width: 2, color: Color(0xFFCCF656), ), ),
-                                          ),
-                                          child: const Center( child: Icon( Icons.shopping_cart_outlined, color: Colors.black, size: 24, ), ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Opacity(
-                                          opacity: areOptionsSelected ? 1.0 : 0.5,
-                                          child: OutlinedButton(
-                                            style: OutlinedButton.styleFrom( side: const BorderSide( width: 2, color: Color(0xFFCCF656), ), shape: RoundedRectangleBorder( borderRadius: BorderRadius.circular(16), ), minimumSize: const Size.fromHeight(50), ),
-                                            onPressed:areOptionsSelected ? () {
-                                              Navigator.pop(context);
-                                               _showBuyOrZatchBottomSheet(context, product, "buy");
-                                            }: null,
-                                            child: const Text( 'Buy', style: TextStyle( color: Colors.black, fontSize: 16, fontFamily: 'Plus Jakarta Sans', fontWeight: FontWeight.w400, ), ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Opacity(
-                                          opacity: areOptionsSelected ? 1.0 : 0.5,
-                                          child: ElevatedButton(
-                                            style: ElevatedButton.styleFrom( backgroundColor: const Color(0xFFCCF656), shape: RoundedRectangleBorder( borderRadius: BorderRadius.circular(16), ), minimumSize: const Size.fromHeight(50), ),
-                                            // Disable button if options are not selected
-                                            onPressed: areOptionsSelected ? () {
-                                              Navigator.pop(context);
-                                               _showBuyOrZatchBottomSheet(context, product, "zatch");
-                                            } : null,
-                                            child: const Text( 'Zatch', style: TextStyle( color: Colors.black, fontSize: 16, fontFamily: 'Plus Jakarta Sans', fontWeight: FontWeight.w400, ), ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
+                      // The rest of the card logic remains the same
+                      return _buildProductCard(product);
                     },
                   ),
                 ),
-
-                // Cancel button
                 Padding(
-                  // Add horizontal padding here to match the cards.
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8.0,
+                    horizontal: 16.0,
+                  ),
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(45),
@@ -925,8 +815,10 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
                       ),
                     ),
                     onPressed: () => Navigator.pop(context),
-                    child: const Text("Cancel",
-                        style: TextStyle(color: Colors.black)),
+                    child: const Text(
+                      "Cancel",
+                      style: TextStyle(color: Colors.black),
+                    ),
                   ),
                 ),
               ],
@@ -936,8 +828,380 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
       },
     );
   }
+
+  // Helper widget for product cards in the bottom sheet to avoid repetition
+  Widget _buildProductCard(Product product) {
+    return StatefulBuilder(
+      builder: (context, setState) {
+        String? selectedSize;
+        Color? selectedColor;
+
+        final areOptionsSelected = selectedSize != null && selectedColor != null;
+        final availableSizes = ["S", "M", "L", "XL"];
+        final availableColors = [
+          _getColorFromString("BLUE"),
+          _getColorFromString("BLACK"),
+          _getColorFromString("BEIGE"),
+          _getColorFromString("RED"),
+          _getColorFromString("WHITE"),
+          _getColorFromString("DUSKY PURPLE"),
+          _getColorFromString("GREEN"),
+        ];
+        // In _LiveDetailsScreenState class
+
+        void handleProceed(String action, Product product, String? selectedSize, Color? selectedColor) {
+          final areOptionsSelected = selectedSize != null && selectedColor != null;
+
+          if (!areOptionsSelected) {
+            _showSelectionRequiredDialog(context);
+            return;
+          }
+
+          // If options are selected, proceed based on the action
+          if (action == "buy" || action == "zatch") {
+            Navigator.pop(context); // Close the catalogue sheet
+            _showBuyOrZatchBottomSheet(
+              context,
+              product,
+              action,
+            );
+          } else if (action == "add_to_cart") {
+            // This is where you would add the product to your cart state management
+            print(
+                "Adding to cart: ${product.name}, Size: $selectedSize, Color: $selectedColor");
+
+            // Show a success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Product added to your cart!"),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 1,
+                blurRadius: 3,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailScreen(productId: product.id),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        product.images.isNotEmpty
+                            ? product.images.first.url
+                            : "https://placehold.co/95x118",
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4.5),
+                          Text(
+                            product.name,
+                            style: const TextStyle(
+                              color: Color(0xFF121111),
+                              fontSize: 14,
+                              fontFamily: 'Encode Sans',
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Text(
+                                product.category?.name ?? 'Dress modern',
+                                style: const TextStyle(
+                                  color: Color(0xFF787676),
+                                  fontSize: 10,
+                                  fontFamily: 'Encode Sans',
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                product.likeCount != null
+                                    ? "${product.likeCount} ⭐"
+                                    : "⭐ 5.0",
+                                style: const TextStyle(
+                                  color: Color(0xFF121111),
+                                  fontSize: 10,
+                                  fontFamily: 'Encode Sans',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14.0),
+                      child: Text(
+                        "${product.price.toStringAsFixed(2)} ₹",
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontFamily: 'Encode Sans',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Choose Size',
+                          style: TextStyle(
+                            color: Color(0xFF121111),
+                            fontSize: 12,
+                            fontFamily: 'Encode Sans',
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children:
+                              availableSizes.map((s) {
+                                final isSelected = selectedSize == s; // Simplified check
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: GestureDetector(
+                                    onTap:
+                                        () =>
+                                            setState(() => selectedSize = s),
+                                    child: Container(
+                                      width: 26,
+                                      height: 26,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isSelected
+                                                ? const Color(0xFF292526)
+                                                : Colors.transparent,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: const Color(0xFFDFDEDE),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        s,
+                                        style: TextStyle(
+                                          color:
+                                              isSelected
+                                                  ? const Color(0xFFFDFDFD)
+                                                  : const Color(0xFF292526),
+                                          fontSize: 12,
+                                          fontFamily: 'Encode Sans',
+                                          fontWeight:
+                                              isSelected
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w400,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Color',
+                          style: TextStyle(
+                            color: Color(0xFF121111),
+                            fontSize: 12,
+                            fontFamily: 'Encode Sans',
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children:
+                                availableColors.map((c) {
+                                  final isSelected = selectedColor == c;
+                                  return GestureDetector(
+                                    onTap:
+                                        () =>
+                                            setState(() => selectedColor = c),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(right: 8),
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border:
+                                            isSelected
+                                                ? Border.all(
+                                                  color: const Color(
+                                                    0xFFAFE80C,
+                                                  ),
+                                                  width: 2,
+                                                )
+                                                : null,
+                                      ),
+                                      child: Container(
+                                        width: 22,
+                                        height: 22,
+                                        decoration: BoxDecoration(
+                                          color: c,
+                                          shape: BoxShape.circle,
+                                          border:
+                                              c == Colors.white
+                                                  ? Border.all(
+                                                    color:
+                                                        Colors.grey.shade300,
+                                                  )
+                                                  : null,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => handleProceed(
+                      "add_to_cart",
+                      product,
+                      selectedSize,
+                      selectedColor,
+                    ),
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: const ShapeDecoration(
+                        shape: OvalBorder(
+                          side: BorderSide(
+                            width: 2,
+                            color: Color(0xFFCCF656),
+                          ),
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.shopping_cart_outlined,
+                          color: Colors.black,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(
+                          width: 2,
+                          color: Color(0xFFCCF656),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                      onPressed: () => handleProceed(
+                        "buy",
+                        product,
+                        selectedSize,
+                        selectedColor,
+                      ),
+                      child: const Text(
+                        'Buy',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ),
+                 /* const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCCF656),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                      onPressed: () => handleProceed("zatch"),
+                      child: const Text(
+                        'Zatch',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ),*/
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showBuyOrZatchBottomSheet(
-      BuildContext context, Product product, String defaultOption) {
+    BuildContext context,
+    Product product,
+    String defaultOption,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -945,271 +1209,353 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (modalContext) {
         int quantity = 1;
         double bargainPrice = product.price;
         String selectedOption = defaultOption;
 
-        return StatefulBuilder(builder: (context, setState) {
-          double price = product.price;
-          double subTotal = selectedOption == "buy"
-              ? price * quantity
-              : bargainPrice * quantity;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            double price = product.price;
 
-          Widget buildCard({
-            required String value,
-            required String title,
-            required Widget child,
-          }) {
-            bool isSelected = selectedOption == value;
-            return Column(
-              children: [
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () => setState(() => selectedOption = value),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                          color: isSelected ? Colors.black : Colors.grey.shade300,
-                          width: isSelected ? 2 : 1),
-                      borderRadius: BorderRadius.circular(12),
+            Widget buildCard({
+              required String value,
+              required String title,
+              required Widget child,
+            }) {
+              bool isSelected = selectedOption == value;
+              return GestureDetector(
+                onTap: () => setState(() => selectedOption = value),
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: isSelected ? Colors.black : Colors.grey.shade300,
+                      width: isSelected ? 2 : 1,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Radio<String>(
-                              value: value,
-                              groupValue: selectedOption,
-                              onChanged: (val) =>
-                                  setState(() => selectedOption = val!),
-                            ),
-                            Text(title,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 16)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        child,
-                      ],
-                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-              ],
-            );
-          }
-
-          return WillPopScope(
-            onWillPop: () async {
-              Navigator.pop(context);
-              _showCatalogueBottomSheet(context);
-              return false;
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // AppBar with back button
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () {
-                          Navigator.pop(context); // Close Buy/Zatch sheet
-                          _showCatalogueBottomSheet(context); // Reopen catalogue
-                        },
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: value,
+                            groupValue: selectedOption,
+                            onChanged:
+                                (val) => setState(() => selectedOption = val!),
+                          ),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        "Buy / Zatch",
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
+                      const SizedBox(height: 8),
+                      child,
                     ],
                   ),
-                  buildCard(
-                    value: "buy",
-                    title: "Buy Product",
-                    child: Row(
+                ),
+              );
+            }
+
+            return WillPopScope(
+              onWillPop: () async {
+                Navigator.pop(context);
+                _showCatalogueBottomSheet(this.context);
+                return false;
+              },
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(context).viewInsets.bottom + 16,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(product.images.first.url,
-                              width: 60, height: 60, fit: BoxFit.cover),
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showCatalogueBottomSheet(this.context);
+                          },
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(product.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold, fontSize: 14)),
-                              const Text("Dress modern",
-                                  style: TextStyle(color: Colors.grey, fontSize: 12)),
-                              Text("${price.toStringAsFixed(2)} ₹",
-                                  style: const TextStyle(fontWeight: FontWeight.bold)),
-                            ],
+                        const SizedBox(width: 8),
+                        const Text(
+                          "Buy / Zatch",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ),
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () {
-                                if (quantity > 1) setState(() => quantity--);
-                              },
-                              icon: const Icon(Icons.remove_circle_outline),
-                            ),
-                            Text("$quantity"),
-                            IconButton(
-                              onPressed: () => setState(() => quantity++),
-                              icon: const Icon(Icons.add_circle_outline),
-                            ),
-                          ],
                         ),
                       ],
                     ),
-                  ),
-                  buildCard(
-                    value: "zatch",
-                    title: "Zatch",
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(product.images.first.url,
-                                  width: 60, height: 60, fit: BoxFit.cover),
+                    buildCard(
+                      value: "buy",
+                      title: "Buy Product",
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              product.images.first.url,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(product.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold, fontSize: 14)),
-                                  const Text("Dress modern",
-                                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                  Text("${price.toStringAsFixed(2)} ₹",
-                                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
-                            Row(
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                IconButton(
-                                  onPressed: () {
-                                    if (quantity > 1) setState(() => quantity--);
-                                  },
-                                  icon: const Icon(Icons.remove_circle_outline),
+                                Text(
+                                  product.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
                                 ),
-                                Text("$quantity"),
-                                IconButton(
-                                  onPressed: () => setState(() => quantity++),
-                                  icon: const Icon(Icons.add_circle_outline),
+                                Text(
+                                  product.category?.name ?? "Live Item",
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  "${price.toStringAsFixed(2)} ₹",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Text("Bargain Price"),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Slider(
-                                value: bargainPrice,
-                                min: 100,
-                                max: price,
-                                divisions: 14,
-                                onChanged: (val) => setState(() => bargainPrice = val),
-                              ),
-                            ),
-                            Text("${bargainPrice.toStringAsFixed(0)} ₹"),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFCCF656),
-                      foregroundColor: Colors.black,
-                      minimumSize: const Size.fromHeight(45),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      if (selectedOption == "buy") {
-                        final itemToCheckout = CartItem(
-                          name: product.name,
-                          description: product.category?.name ?? "Live Stream Item", // Use category name or a default
-                          price: product.price,
-                          quantity: quantity, // The quantity selected in the bottom sheet
-                          imageUrl: product.images.isNotEmpty
-                              ? product.images.first.url
-                              : "https://placehold.co/100x100?text=P",
-
-                        );
-
-                        // 2. Calculate the total prices.
-                        double itemsTotal = itemToCheckout.price * itemToCheckout.quantity;
-                        double shippingFee = 50.0; // Example shipping fee, or calculate as needed.
-                        double subTotal = itemsTotal + shippingFee;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CheckoutOrPaymentsScreen(isCheckout: true,
-                            selectedItems: [itemToCheckout],
-                              itemsTotalPrice: itemsTotal,
-                              shippingFee: shippingFee,
-                              subTotalPrice: subTotal,),
                           ),
-                        );
-                      } else {
-                        // Navigate to Bargain screen
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ZatchingDetailsScreen(
-                              zatch: Zatch(
-                                id: "temp1",
-                                name: product.name,
-                                description: product.category?.description ?? "",
-                                seller: "Seller Name", // optional
-                                imageUrl: product.images.first.url,
-                                active: true,
-                                status: "My Offer",
-                                quotePrice: "${bargainPrice.toStringAsFixed(0)} ₹",
-                                sellerPrice: "",
-                                quantity: quantity,
-                                subTotal: "${(bargainPrice * quantity).toStringAsFixed(0)} ₹",
-                                date: DateTime.now().toString(),
+                          Row(
+                            children: [
+                              IconButton(
+                                onPressed:
+                                    () => setState(() {
+                                      if (quantity > 1) quantity--;
+                                    }),
+                                icon: const Icon(Icons.remove_circle_outline),
                               ),
-                            ),
+                              Text("$quantity"),
+                              IconButton(
+                                onPressed: () => setState(() => quantity++),
+                                icon: const Icon(Icons.add_circle_outline),
+                              ),
+                            ],
                           ),
-                        );
-
-                      }
-                    },
-                    child: Text(selectedOption == "buy" ? "Buy" : "Bargain"),
-                  )
-
-                ],
+                        ],
+                      ),
+                    ),
+                    buildCard(
+                      value: "zatch",
+                      title: "Zatch",
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  product.images.first.url,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      product.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      product.category?.name ?? "Live Item",
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    Text(
+                                      "${price.toStringAsFixed(2)} ₹",
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    onPressed:
+                                        () => setState(() {
+                                          if (quantity > 1) quantity--;
+                                        }),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
+                                  ),
+                                  Text("$quantity"),
+                                  IconButton(
+                                    onPressed: () => setState(() => quantity++),
+                                    icon: const Icon(Icons.add_circle_outline),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Text("Bargain Price"),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Slider(
+                                  value: bargainPrice,
+                                  min: 100,
+                                  max: price,
+                                  divisions:
+                                      (price - 100).toInt() > 0
+                                          ? (price - 100).toInt()
+                                          : 1,
+                                  onChanged:
+                                      (val) =>
+                                          setState(() => bargainPrice = val),
+                                ),
+                              ),
+                              Text("${bargainPrice.toStringAsFixed(0)} ₹"),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCCF656),
+                        foregroundColor: Colors.black,
+                        minimumSize: const Size.fromHeight(45),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        if (selectedOption == "buy") {
+                          final itemToCheckout = CartItem(
+                            name: product.name,
+                            description:
+                                product.category?.name ?? "Live Stream Item",
+                            price: product.price,
+                            quantity: quantity,
+                            imageUrl:
+                                product.images.isNotEmpty
+                                    ? product.images.first.url
+                                    : "https://placehold.co/100x100?text=P",
+                          );
+                          double itemsTotal =
+                              itemToCheckout.price * itemToCheckout.quantity;
+                          double shippingFee = 50.0;
+                          double subTotal = itemsTotal + shippingFee;
+                          Navigator.push(
+                            this.context,
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => CheckoutOrPaymentsScreen(
+                                    isCheckout: true,
+                                    selectedItems: [itemToCheckout],
+                                    itemsTotalPrice: itemsTotal,
+                                    shippingFee: shippingFee,
+                                    subTotalPrice: subTotal,
+                                  ),
+                            ),
+                          );
+                        } else {
+                          Navigator.pushReplacement(
+                            this.context,
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => ZatchingDetailsScreen(
+                                    zatch: Zatch(
+                                      id:
+                                          "temp_${DateTime.now().millisecondsSinceEpoch}",
+                                      name: product.name,
+                                      description:
+                                          product.category?.description ?? "",
+                                      seller:
+                                          widget
+                                              .controller
+                                              .session
+                                              ?.host
+                                              ?.username ??
+                                          "Seller",
+                                      imageUrl: product.images.first.url,
+                                      active: true,
+                                      status: "My Offer",
+                                      quotePrice:
+                                          "${bargainPrice.toStringAsFixed(0)} ₹",
+                                      sellerPrice: "",
+                                      quantity: quantity,
+                                      subTotal:
+                                          "${(bargainPrice * quantity).toStringAsFixed(0)} ₹",
+                                      date: DateTime.now().toIso8601String(),
+                                    ),
+                                  ),
+                            ),
+                          );
+                        }
+                      },
+                      child: Text(selectedOption == "buy" ? "Buy" : "Bargain"),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        });
+            );
+          },
+        );
       },
     );
   }
 
+  void _showSelectionRequiredDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Options Required"),
+          content: const Text("Please select a size and color for the product before proceeding."),
+          actions: <Widget>[
+            TextButton(
+              child: const Text("OK"),
+              onPressed: () {
+                Navigator.of(context).pop(); // Dismiss the dialog
+              },
+            ),
+          ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _SidebarItem extends StatelessWidget {
@@ -1221,64 +1567,110 @@ class _SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (label == null || label!.isEmpty) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.10),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withOpacity(0.30)),
+          ),
+          child: Icon(icon, color: Colors.white, size: 24),
+        ),
+      );
+    }
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: const BoxDecoration(
-              color: Color.fromRGBO(0, 0, 0, 0.25),
-              shape: BoxShape.circle,
+      child: Container(
+        width: 59,
+        height: 80,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: Colors.white.withOpacity(0.30), width: 1),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 28),
+            const SizedBox(height: 5),
+            Text(
+              label!,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontFamily: 'Plus Jakarta Sans',
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-          if (label != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(label!,
-                  style: const TextStyle(color: Colors.white, fontSize: 11)),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
+
 class _ChatBubble extends StatelessWidget {
   final String user;
   final String message;
+  final String? avatarUrl;
 
   const _ChatBubble({
     required this.user,
     required this.message,
+    this.avatarUrl,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 14,
-            backgroundImage: NetworkImage("https://placehold.co/40x40"), // demo
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Text(
-                message,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 14,
+          backgroundImage:
+              avatarUrl != null && avatarUrl!.isNotEmpty
+                  ? NetworkImage(avatarUrl!)
+                  : null,
+          child:
+              (avatarUrl == null || avatarUrl!.isEmpty)
+                  ? Text(
+                    user.isNotEmpty ? user[0].toUpperCase() : 'U',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                  : null,
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: RichText(
+              text: TextSpan(
                 style: const TextStyle(color: Colors.white, fontSize: 12),
+                children: [
+                  TextSpan(
+                    text: '$user: ',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  TextSpan(text: message),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
-

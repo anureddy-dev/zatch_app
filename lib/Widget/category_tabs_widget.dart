@@ -34,8 +34,6 @@ class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
     try {
       await _controller.fetchCategories();
       _orderCategories();
-
-      // Auto-select first category if nothing is selected (direct Home)
       if (_orderedCategories.isNotEmpty && _selectedCategoryName == null) {
         _selectedCategoryName = _orderedCategories.first.name;
         final initialCategory = _orderedCategories.first;

@@ -1,3 +1,35 @@
+class ResponseApi {
+  final bool success;
+  final String message;
+  final SendOtpResponse data;
+  final int status;
+
+  ResponseApi({
+    required this.success,
+    required this.message,
+    required this.data,
+    required this.status,
+  });
+
+  factory ResponseApi.fromJson(Map<String, dynamic> json) {
+    return ResponseApi(
+      success: json["success"] ?? false,
+      message: json["message"] ?? "",
+      data: SendOtpResponse.fromJson(json["data"] ?? {}),
+      status: json["status"] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "success": success,
+      "message": message,
+      "data": data.toJson(),
+      "status": status,
+    };
+  }
+}
+
 class SendOtpResponse {
   final String sid;
   final String serviceSid;

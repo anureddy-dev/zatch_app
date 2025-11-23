@@ -1,3 +1,37 @@
+import 'package:zatch_app/model/verify_otp_response.dart';
+
+class VerifyApiResponse {
+  final bool success;
+  final String message;
+  final VerifyOtpResponse data;
+  final int status;
+
+  VerifyApiResponse({
+    required this.success,
+    required this.message,
+    required this.data,
+    required this.status,
+  });
+
+  factory VerifyApiResponse.fromJson(Map<String, dynamic> json) {
+    return VerifyApiResponse(
+      success: json["success"] ?? false,
+      message: json["message"] ?? "",
+      data: VerifyOtpResponse.fromJson(json["data"] ?? {}),
+      status: json["status"] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "success": success,
+      "message": message,
+      "data": data.toJson(),
+      "status": status,
+    };
+  }
+}
+
 class VerifyOtpResponse {
   final String? sid;
   final String? serviceSid;
@@ -25,18 +59,17 @@ class VerifyOtpResponse {
     this.dateUpdated,
   });
 
-  /// ✅ Factory constructor to parse JSON
   factory VerifyOtpResponse.fromJson(Map<String, dynamic> json) {
     return VerifyOtpResponse(
-      sid: json['sid'],
-      serviceSid: json['serviceSid'],
-      accountSid: json['accountSid'],
-      to: json['to'],
-      channel: json['channel'],
-      status: json['status'],
-      valid: json['valid'],
-      amount: json['amount'],
-      payee: json['payee'],
+      sid: json['sid'] as String?,
+      serviceSid: json['serviceSid'] as String?,
+      accountSid: json['accountSid'] as String?,
+      to: json['to'] as String?,
+      channel: json['channel'] as String?,
+      status: json['status'] as String?,
+      valid: json['valid'] as bool?,
+      amount: json['amount'] as String?,
+      payee: json['payee'] as String?,
       dateCreated: json['dateCreated'] != null
           ? DateTime.tryParse(json['dateCreated'])
           : null,
@@ -46,7 +79,6 @@ class VerifyOtpResponse {
     );
   }
 
-  /// ✅ Convert model back to JSON
   Map<String, dynamic> toJson() {
     return {
       "sid": sid,
@@ -63,3 +95,4 @@ class VerifyOtpResponse {
     };
   }
 }
+

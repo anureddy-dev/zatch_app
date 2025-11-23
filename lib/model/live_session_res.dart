@@ -1,5 +1,7 @@
 // Removed unnecessary import 'dart:ffi';
 
+import 'dart:convert';
+
 class LiveSessionsResponse {
   final bool success;
   final List<Session> sessions;
@@ -112,3 +114,67 @@ class Host {
     };
   }
 }
+
+SessionDetails sessionDetailsFromApiResponse(String str) {
+  final jsonData = json.decode(str);
+  if (jsonData['success'] == true && jsonData['sessionDetails'] != null) {
+    return SessionDetails.fromJson(jsonData['sessionDetails']);
+  } else {
+    throw Exception("Failed to parse session details from API response or success was false.");
+  }
+}
+
+class SessionDetails {
+  final String id;
+  final String channelName;
+  final String title;
+  final String description;
+  final Host host;
+  final String status;
+  final DateTime scheduledStartTime;
+  final int viewersCount;
+  final int peakViewers;
+  final List<String> products;
+  final String? thumbnail;
+  final bool isLive;
+  final bool isHost;
+  final String shareLink;
+
+  SessionDetails({
+    required this.id,
+    required this.channelName,
+    required this.title,
+    required this.description,
+    required this.host,
+    required this.status,
+    required this.scheduledStartTime,
+    required this.viewersCount,
+    required this.peakViewers,
+    required this.products,
+    this.thumbnail,
+    required this.isLive,
+    required this.isHost,
+    required this.shareLink,
+  });
+
+  factory SessionDetails.fromJson(Map<String, dynamic> json) {
+    return SessionDetails(
+      id: json["_id"],
+      channelName: json["channelName"],
+      title: json["title"],
+      description: json["description"],
+      host: Host.fromJson(json["host"]),
+      status: json["status"],
+      scheduledStartTime: DateTime.parse(json["scheduledStartTime"]),
+      viewersCount: json["viewersCount"],
+      peakViewers: json["peakViewers"],
+      // Safely parse the list of product strings
+      products: List<String>.from(json["products"].map((x) => x)),
+      thumbnail: json["thumbnail"],
+      isLive: json["isLive"],
+      isHost: json["isHost"],
+      shareLink: json["shareLink"],
+    );
+  }
+}
+

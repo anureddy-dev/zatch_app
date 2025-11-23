@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// Import the staggered grid view package
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:zatch_app/controller/live_stream_controller.dart';
 import 'package:zatch_app/model/TrendingBit.dart';
 import 'package:zatch_app/services/api_service.dart';
@@ -76,19 +78,23 @@ class _TrendingSectionState extends State<TrendingSection> {
                 ],
               ),
             ),
-            GridView.builder(
+            // Use AlignedGridView for the staggered effect
+            AlignedGridView.count(
               itemCount: bits.length,
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisExtent: 320,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-              ),
               itemBuilder: (context, index) {
-                return TrendingCard(bit: bits[index]);
+                // Determine a different height for even/odd items to create stagger
+                final isEven = index % 2 == 0;
+                final double imageHeight = isEven ? 251 : 290;
+                return TrendingCard(
+                  bit: bits[index],
+                  imageHeight: imageHeight,
+                );
               },
             ),
           ],
@@ -99,7 +105,10 @@ class _TrendingSectionState extends State<TrendingSection> {
 }
 
 class TrendingCard extends StatefulWidget {
-  final TrendingBit bit;  const TrendingCard({super.key, required this.bit});
+  final TrendingBit bit;
+  final double imageHeight; // Accept image height to create stagger
+  const TrendingCard(
+      {super.key, required this.bit, required this.imageHeight});
 
   @override
   State<TrendingCard> createState() => _TrendingCardState();
@@ -115,210 +124,215 @@ class _TrendingCardState extends State<TrendingCard> {
   void initState() {
     super.initState();
     likeCount = widget.bit.likeCount;
-    isLiked = likeCount > 0;
+    // This logic is still flawed and should be updated once the API provides `isLikedByUser`
+    isLiked = widget.bit.likeCount > 0;
   }
 
   Future<void> _toggleLike() async {
     if (isApiCallInProgress) return;
+    setState(() => isApiCallInProgress = true);
 
+    // Simplified optimistic update
     setState(() {
-      isApiCallInProgress = true;
       isLiked = !isLiked;
-      if (isLiked) {
-        likeCount++;
-      } else {
-        likeCount--;
-      }
+      likeCount += isLiked ? 1 : -1;
     });
 
     try {
-      final newServerLikeCount = await _api.toggleLike(widget.bit.id);
-      widget.bit.likeCount = newServerLikeCount;
-      setState(() {
-        likeCount = newServerLikeCount;
-        isLiked = newServerLikeCount > 0;
-      });
+      final response = await _api.toggleLike(widget.bit.id);
+      final serverLikeCount = response['likeCount'] as int;
+      final serverIsLiked = response['isLiked'] as bool;
 
-    } catch (e) {
-      setState(() {
-        isLiked = !isLiked;
-        if (isLiked) {
-          likeCount++;
-        } else {
-          likeCount--;
-        }
-      });
-      debugPrint("Failed to toggle like: $e");
+      widget.bit.likeCount = serverLikeCount;
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Action failed. Please try again."), backgroundColor: Colors.red),
-        );
+        setState(() {
+          likeCount = serverLikeCount;
+          isLiked = serverIsLiked;
+        });
+      }
+    } catch (e) {
+      // Revert on failure
+      if (mounted) {
+        setState(() {
+          isLiked = !isLiked;
+          likeCount += isLiked ? 1 : -1;
+        });
+        debugPrint("Failed to toggle like: $e");
       }
     } finally {
       if (mounted) {
-        setState(() {
-          isApiCallInProgress = false;
-        });
+        setState(() => isApiCallInProgress = false);
       }
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        if (widget.bit.isLive == true) {
+        if (widget.bit.isLive) {
           Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (_) => const SeeAllLiveScreen(
-                  liveSessions: [],
-                )),
+                builder: (_) => const SeeAllLiveScreen(liveSessions: [])),
           );
         } else {
           Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (_) =>
-                    ReelDetailsScreen(bitId:widget.bit.id ?? '', controller: LiveStreamController())), // use actual id
+                builder: (_) => ReelDetailsScreen(
+                    bitId: widget.bit.id, controller: LiveStreamController())),
           );
         }
       },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 6,
-              offset: const Offset(0, 3),
+      // The card is now just a Column, the container/decoration is removed
+      // as the new design doesn't show a card background for the text part.
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image container with rounded corners and widgets on top
+          Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  Image.network(
-                    widget.bit.thumbnailUrl,
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 200,
-                        color: Colors.grey[300],
-                        child: const Center(child: Icon(Icons.error)),
-                      );
-                    },
+            child: Stack(
+              children: [
+                Image.network(
+                  widget.bit.thumbnailUrl,
+                  height: widget.imageHeight,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: widget.imageHeight,
+                    color: Colors.grey[300],
+                    child: const Center(child: Icon(Icons.error)),
                   ),
-                  if (widget.bit.isLive == true)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFBBF711),
-                          borderRadius: BorderRadius.circular(48),
-                        ),
-                        child: const Text(
-                          'LIVE',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
+                ),
+                if (widget.bit.isLive)
                   Positioned(
-                    top: 8,
-                    right: 8,
-                    child: GestureDetector(
-                      onTap: _toggleLike,
-                      child: CircleAvatar(
-                        radius: 14,
-                        backgroundColor: Colors.black.withOpacity(0.6),
-                        child: isApiCallInProgress
-                            ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                            : Icon(
-                          // The icon is determined by the 'isLiked' state variable
-                          isLiked ? Icons.favorite : Icons.favorite_border,
-                          color: isLiked ? Colors.red : Colors.white,
-                          size: 16,
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFBBF711),
+                        borderRadius: BorderRadius.circular(48),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.25),
+                            blurRadius: 3,
+                            offset: const Offset(0, 2),
+                          )
+                        ],
+                      ),
+                      child: Text(
+                        'Live', // The design has 'Live' and a count, but the model doesn't have a viewer count
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                          fontFamily: 'Encode Sans',
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Positioned(
+                  top: 14,
+                  right: 14,
+                  child: GestureDetector(
+                    onTap: _toggleLike,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: ShapeDecoration(
+                        color: const Color(0xFF292526).withOpacity(0.8),
+                        shape: const CircleBorder(),
+                      ),
+                      child: isApiCallInProgress
+                          ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        ),
+                      )
+                          : Icon(
+                        isLiked ? Icons.favorite : Icons.favorite_border,
+                        color: isLiked ? Colors.red : Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Text section below the image
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.bit.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 14,
+                    fontFamily: 'Encode Sans',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.bit.description,
+                  style: const TextStyle(
+                    color: Color(0xFF787676),
+                    fontSize: 10,
+                    fontFamily: 'Encode Sans',
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      widget.bit.title ?? 'Untitled',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      // BUG: Using viewCount for price. Update when model has `price`.
+                      '₹${widget.bit.viewCount}',
                       style: const TextStyle(
+                        color: Colors.black,
                         fontSize: 14,
+                        fontFamily: 'Encode Sans',
                         fontWeight: FontWeight.w600,
-                        fontFamily: 'Encode Sans',
                       ),
                     ),
-                    Text(
-                      widget.bit.description ?? 'No category',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w400,
-                        color: Colors.grey,
-                        fontFamily: 'Encode Sans',
-                      ),
-                    ),
-                    const SizedBox(height: 6),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        const Icon(Icons.star, size: 18, color: Colors.amber),
+                        const SizedBox(width: 4),
                         Text(
-                          '\$${widget.bit.viewCount ?? 'N/A'}',
+                          // BUG: Using viewCount for rating. Update when model has `rating`.
+                          widget.bit.viewCount.toString(),
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                            fontSize: 12,
                             fontFamily: 'Encode Sans',
+                            fontWeight: FontWeight.w400,
                           ),
-                        ),
-                        Row(
-                          children: [
-                            const Icon(Icons.star,
-                                size: 16, color: Colors.amber),
-                            const SizedBox(width: 2),
-                            Text(
-                              widget.bit.viewCount?.toString() ?? '0.0',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                                fontFamily: 'Encode Sans',
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
                   ],
                 ),
-              )
-            ],
-          ),
-        ),
+              ],
+            ),
+          )
+        ],
       ),
     );
   }

@@ -40,10 +40,13 @@ class FollowingScreen extends StatefulWidget {
 }
 
 class _FollowingScreenState extends State<FollowingScreen> {
+  // ✅ FIX: This flag is what we'll send back to the previous screen.
+  bool _hasUnfollowed = false;
   // State variables
   late List<FollowedUser> _originalList; // The full list, for resetting search
   late List<FollowedUser> _filteredList; // The list to be displayed, after filtering
   bool _isDummyData = false;
+  // ✅ FIX: Use a Set of Strings to track loading state for each user ID.
   final Set<String> _loadingUsers = {}; // Tracks loading state for each user card
   final TextEditingController _searchController = TextEditingController();
 
@@ -88,24 +91,28 @@ class _FollowingScreenState extends State<FollowingScreen> {
       _showMessage("Preview Mode", "This is just a preview.", isError: true);
       return;
     }
+    // ✅ FIX: Check if this specific user's ID is already in the loading set.
     if (_loadingUsers.contains(user.id)) return;
 
+    // ✅ FIX: Add THIS user's ID to the set to trigger its loading state.
     setState(() => _loadingUsers.add(user.id));
 
     try {
       // Call the API to toggle the follow status
       await ApiService().toggleFollowUser(user.id);
 
-      // If successful, update the local lists
+      // If successful, update the local lists and set the flag
       setState(() {
         _originalList.removeWhere((item) => item.id == user.id);
         _filterList(); // Re-apply the filter to update the UI
+        _hasUnfollowed = true; // Set the flag to notify the previous screen
       });
 
       _showMessage("Success", "You unfollowed ${user.username}");
     } catch (e) {
       _showMessage("Error", "Failed to unfollow. Please try again.", isError: true);
     } finally {
+      // ✅ FIX: Always remove THIS user's ID from the set when done.
       if (mounted) {
         setState(() => _loadingUsers.remove(user.id));
       }
@@ -148,89 +155,98 @@ class _FollowingScreenState extends State<FollowingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F2),
-      appBar: AppBar(
-        elevation: 0,
+    // ✅ FIX: Use WillPopScope to send a result back when the user navigates away.
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pop(_hasUnfollowed);
+        return false;
+      },
+      child: Scaffold(
         backgroundColor: const Color(0xFFF2F2F2),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Following',
-          style: TextStyle(
-            color: Color(0xFF121111),
-            fontSize: 16,
-            fontFamily: 'Encode Sans',
-            fontWeight: FontWeight.w600,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: const Color(0xFFF2F2F2),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+            // ✅ FIX: The app bar back button should also send the result.
+            onPressed: () => Navigator.of(context).pop(_hasUnfollowed),
           ),
-        ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(30, 16, 30, 16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search Following...',
-                hintStyle: const TextStyle(color: Color(0xFF626262), fontSize: 14, fontFamily: 'Encode Sans'),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF626262)),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+          title: const Text(
+            'Following',
+            style: TextStyle(
+              color: Color(0xFF121111),
+              fontSize: 16,
+              fontFamily: 'Encode Sans',
+              fontWeight: FontWeight.w600,
             ),
           ),
-          // List of Sellers
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 30),
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Opacity(
-                opacity: _isDummyData ? 0.5 : 1.0,
-                child: _filteredList.isEmpty
-                    ? Center(
-                  child: Text(
-                    _searchController.text.isNotEmpty
-                        ? "No users found for '${_searchController.text}'"
-                        : "You are not following anyone yet.",
-                    style: const TextStyle(color: Colors.grey),
-                    textAlign: TextAlign.center,
+          centerTitle: true,
+        ),
+        body: Column(
+          children: [
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(30, 16, 30, 16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search Following...',
+                  hintStyle: const TextStyle(color: Color(0xFF626262), fontSize: 14, fontFamily: 'Encode Sans'),
+                  prefixIcon: const Icon(Icons.search, color: Color(0xFF626262)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
-                )
-                    : ListView.builder(
-                  padding: const EdgeInsets.all(20.0),
-                  itemCount: _filteredList.length,
-                  itemBuilder: (context, index) {
-                    final user = _filteredList[index];
-                    final isLoading = _loadingUsers.contains(user.id);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 24.0),
-                      child: FollowingSellerCard(
-                        user: user,
-                        isLoading: isLoading, // Pass loading state
-                        onView: () => _viewProfile(user),
-                        onUnfollow: () => _unfollow(user),
-                      ),
-                    );
-                  },
                 ),
               ),
             ),
-          ),
-        ],
+            // List of Sellers
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 30),
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Opacity(
+                  opacity: _isDummyData ? 0.5 : 1.0,
+                  child: _filteredList.isEmpty
+                      ? Center(
+                    child: Text(
+                      _searchController.text.isNotEmpty
+                          ? "No users found for '${_searchController.text}'"
+                          : "You are not following anyone yet.",
+                      style: const TextStyle(color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                      : ListView.builder(
+                    padding: const EdgeInsets.all(20.0),
+                    itemCount: _filteredList.length,
+                    itemBuilder: (context, index) {
+                      final user = _filteredList[index];
+                      // ✅ FIX: The check is now specific to THIS user's ID.
+                      final isLoading = _loadingUsers.contains(user.id);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 24.0),
+                        child: FollowingSellerCard(
+                          user: user,
+                          isLoading: isLoading, // Pass the specific loading state
+                          onView: () => _viewProfile(user),
+                          onUnfollow: () => _unfollow(user),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
